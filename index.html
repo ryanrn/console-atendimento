@@ -318,6 +318,43 @@
   }
   #pad-text::placeholder{ color: var(--text-muted); }
 
+  /* ---------- Contatos ---------- */
+  .contacts-head{ display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+  .contacts-head p{ margin: 0; color: var(--text-muted); font-size: 12.5px; }
+  .contacts{ display: grid; grid-template-columns: repeat(auto-fill, minmax(min(440px, 100%), 1fr)); gap: 0 24px; }
+  .letter{
+    grid-column: 1 / -1;
+    font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 600;
+    color: var(--accent-strong);
+    padding: 16px 8px 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px;
+  }
+  .contact{ display: flex; align-items: center; gap: 8px 10px; padding: 9px 8px; border-radius: 10px; }
+  .contact:hover{ background: var(--surface); }
+  .contact-main{ flex: 1 1 auto; min-width: 0; }
+  .contact-nums, .contact-actions{ flex: none; }
+  @media (max-width: 420px){
+    .contact{ flex-wrap: wrap; }
+    .contact-main{ flex-basis: 100%; }
+    .contact-nums{ flex: 1 1 auto; }
+  }
+  .contact-name{ font-weight: 600; font-size: 14px; line-height: 1.35; }
+  .contact-obs{ font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
+  .contact-nums{ display: flex; gap: 6px; flex-wrap: wrap; }
+  .num{
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: "JetBrains Mono", monospace; font-size: 13px; font-weight: 600;
+    font-variant-numeric: tabular-nums; letter-spacing: .02em;
+    padding: 6px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    transition: border-color .12s ease, color .12s ease;
+  }
+  .num:hover{ border-color: var(--accent); color: var(--accent-strong); }
+  .num svg{ opacity: .5; flex: none; }
+  .contact-actions{ display: flex; gap: 2px; opacity: 0; transition: opacity .12s ease; }
+  .contact:hover .contact-actions, .contact:focus-within .contact-actions{ opacity: 1; }
+  .contact-actions .icon-btn{ width: 28px; height: 28px; }
+  @media (hover: none){ .contact-actions{ opacity: 1; } }
+
   /* ---------- Team ---------- */
   .team-head{ display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .team-head h2{ margin: 0; font-size: 18px; letter-spacing: -0.01em; }
@@ -460,7 +497,7 @@
 <!-- ============ Login ============ -->
 <div class="auth" id="screen-login" hidden>
   <div class="auth-card">
-    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div class="brand-text"><h1>Console de Atendimento</h1><span>Respostas prontas e bloco de notas</span></div></div>
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><div class="brand-text"><h1>Console de Atendimento</h1><span>Respostas, contatos e bloco de notas</span></div></div>
     <h2>Entrar</h2>
     <p class="lead">Use o e-mail cadastrado pelo administrador da equipe.</p>
     <form id="login-form" novalidate>
@@ -504,7 +541,7 @@
   <div class="topbar">
     <div class="brand">
       <div class="brand-mark" aria-hidden="true"></div>
-      <div class="brand-text"><h1>Console de Atendimento</h1><span>Respostas prontas e bloco de notas</span></div>
+      <div class="brand-text"><h1>Console de Atendimento</h1><span>Respostas, contatos e bloco de notas</span></div>
     </div>
     <div class="search-wrap">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.2" stroke="currentColor" stroke-width="1.6"/><path d="M11 11L14.2 14.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -513,13 +550,14 @@
     </div>
     <button class="btn btn-primary" id="btn-new" hidden>
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      Nova resposta
+      <span id="btn-new-label">Nova resposta</span>
     </button>
   </div>
 
   <div class="viewbar">
     <div class="tabs" role="tablist" aria-label="Seções">
       <button class="tab" role="tab" id="tab-respostas" aria-selected="true">Respostas prontas <span class="count" id="tab-count-respostas"></span></button>
+      <button class="tab" role="tab" id="tab-contatos" aria-selected="false">Contatos <span class="count" id="tab-count-contatos"></span></button>
       <button class="tab" role="tab" id="tab-bloco" aria-selected="false">Bloco de notas <span class="count" id="tab-count-bloco"></span></button>
       <button class="tab" role="tab" id="tab-equipe" aria-selected="false" hidden>Equipe <span class="count" id="tab-count-equipe"></span></button>
     </div>
@@ -543,6 +581,13 @@
     <div class="filters" id="filters" role="group" aria-label="Filtrar por categoria"></div>
     <div class="status-line" id="status-count"></div>
     <div class="grid" id="grid"></div>
+  </section>
+
+  <section id="view-contatos" hidden>
+    <div class="contacts-head">
+      <p id="contatos-status"></p>
+    </div>
+    <div class="contacts" id="contacts"></div>
   </section>
 
   <section id="view-bloco" hidden>
@@ -628,6 +673,29 @@
       <div class="modal-actions">
         <button type="button" class="btn" data-close="form">Cancelar</button>
         <button type="submit" class="btn btn-primary" id="form-save">Salvar resposta</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Contato: criar/editar -->
+<div class="modal-wrap" id="contact-modal-wrap">
+  <div class="modal small">
+    <div class="modal-head">
+      <h2 id="contact-modal-title">Novo contato</h2>
+      <button class="icon-btn" data-close="contact" aria-label="Fechar"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+    </div>
+    <form id="contact-form" novalidate>
+      <div class="modal-body">
+        <div class="form-error" id="contact-error" role="alert"></div>
+        <div class="field"><label for="c-name">Nome ou setor</label><input type="text" id="c-name" required autocomplete="off" placeholder="Ex.: Fechamento de Laudos — Jardins"></div>
+        <div class="field"><label for="c-nums">Número(s)</label><input type="text" id="c-nums" class="mono" required autocomplete="off" placeholder="Ex.: 2151-5714 (vários: separe por vírgula)"></div>
+        <div class="field"><label for="c-obs">Observação (opcional)</label><input type="text" id="c-obs" autocomplete="off" placeholder="Ex.: falar com a Ana · atende até 18h"></div>
+        <p class="form-note" id="c-note">Todos da equipe vão ver este contato.</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close="contact">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="contact-save">Salvar contato</button>
       </div>
     </form>
   </div>
@@ -751,7 +819,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   var state = {
     session: null, me: null,
     view: "respostas",
-    respostas: [], pad: {}, members: [],
+    respostas: [], contatos: [], pad: {}, members: [],
     query: "", activeCategory: "all",
     selectedId: null, editingId: null, padDate: null,
     lastRespostasFetch: 0
@@ -961,7 +1029,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     await flushPad();
     if (state.session) removeLS(DRAFT_PREFIX + state.session.user.id);
     try{ await sb.auth.signOut(); }catch(e){}
-    state.session = null; state.me = null; state.respostas = []; state.pad = {}; state.members = [];
+    state.session = null; state.me = null; state.respostas = []; state.contatos = []; state.pad = {}; state.members = [];
     $("pad-text").value = "";
     closeAllPanels();
     $("user-menu").hidden = true;
@@ -981,10 +1049,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("drawer-edit").hidden = !isAdmin();
     $("drawer-delete").hidden = !isAdmin();
     state.padDate = todayIso();
-    await Promise.all([loadRespostas(), loadPad(), isAdmin() ? loadMembers() : Promise.resolve()]);
+    await Promise.all([loadRespostas(), loadContatos(), loadPad(), isAdmin() ? loadMembers() : Promise.resolve()]);
     var hash = (location.hash || "").replace("#", "");
     var pref = null; try{ pref = localStorage.getItem(VIEW_KEY); }catch(e){}
-    var initial = ["respostas", "bloco", "equipe"].indexOf(hash) !== -1 ? hash : (pref || "respostas");
+    var initial = VIEWS.indexOf(hash) !== -1 ? hash : (pref || "respostas");
     if (initial === "equipe" && !isAdmin()) initial = "respostas";
     setView(initial, { focus: initial === "bloco" });
   }
@@ -1081,6 +1149,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
   function updateTabCounts(){
     $("tab-count-respostas").textContent = state.respostas.length || "";
+    $("tab-count-contatos").textContent = state.contatos.length || "";
     var n = padDays().length;
     $("tab-count-bloco").textContent = n || "";
     $("tab-count-equipe").textContent = state.members.length || "";
@@ -1160,6 +1229,144 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       if (state.selectedId === id) closeDetail();
       await loadRespostas();
       showToast("Resposta excluída");
+    });
+  }
+
+  /* ---------- Contatos ---------- */
+  var VIEWS = ["respostas", "contatos", "bloco", "equipe"];
+  var COPY_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M3 10.5V3.8A1.3 1.3 0 014.3 2.5H10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+  var EDIT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.3 2.3a1.5 1.5 0 012.1 2.1L5 12.8l-2.9.7.7-2.9 8.5-8.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>';
+  var TRASH_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6.5 5V3.5h3V5M4.5 5l.6 8.2a1 1 0 001 .8h3.8a1 1 0 001-.8L11.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var editingContactId = null;
+
+  function digitsOf(s){ return String(s || "").replace(/\D/g, ""); }
+  function formatNum(n){
+    var d = digitsOf(n);
+    if (/^\d{8}$/.test(d)) return d.slice(0, 4) + "-" + d.slice(4);
+    if (/^\d{9}$/.test(d)) return d.slice(0, 5) + "-" + d.slice(5);
+    if (/^\d{10}$/.test(d)) return "(" + d.slice(0, 2) + ") " + d.slice(2, 6) + "-" + d.slice(6);
+    if (/^\d{11}$/.test(d)) return "(" + d.slice(0, 2) + ") " + d.slice(2, 7) + "-" + d.slice(7);
+    return String(n);
+  }
+  function stripAccents(s){ return String(s).normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+  function canEditContato(c){ return isAdmin() || (!!c.criado_por && !!state.session && c.criado_por === state.session.user.id); }
+  function findContato(id){ return state.contatos.filter(function(x){ return x.id === id; })[0]; }
+
+  async function loadContatos(){
+    var r = await sb.from("console_contatos").select("id, nome, telefones, observacao, criado_por, atualizado_em").order("nome");
+    if (r.error){ showToast(friendlyError(r.error, "Não foi possível carregar os contatos")); return; }
+    state.contatos = r.data || [];
+    if (state.view === "contatos") renderContatos(); else updateTabCounts();
+  }
+
+  function filteredContatos(){
+    var q = stripAccents(state.query.trim().toLowerCase());
+    var qd = digitsOf(q);
+    var list = state.contatos.slice().sort(function(a, b){ return a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }); });
+    if (!q) return list;
+    return list.filter(function(c){
+      var hay = stripAccents((c.nome + " " + (c.observacao || "")).toLowerCase());
+      if (hay.indexOf(q) !== -1) return true;
+      return qd.length >= 3 && (c.telefones || []).some(function(t){ return digitsOf(t).indexOf(qd) !== -1; });
+    });
+  }
+
+  function renderContatos(){
+    var list = filteredContatos();
+    var q = state.query.trim();
+    $("contatos-status").textContent = q
+      ? (list.length ? plural(list.length, "contato encontrado", "contatos encontrados") + " · Enter copia o primeiro número" : "")
+      : plural(state.contatos.length, "contato", "contatos") + " · clique no número para copiar";
+    var wrap = $("contacts");
+    if (!list.length){
+      wrap.innerHTML = state.contatos.length
+        ? '<div class="empty-state"><h3>Nenhum contato encontrado</h3><p>Tente parte do nome, do setor ou do número. Conseguiu um número novo? Clique em "Novo contato" e salve para a equipe.</p></div>'
+        : '<div class="empty-state"><h3>Nenhum contato ainda</h3><p>Clique em "Novo contato" para salvar o primeiro.</p></div>';
+      updateTabCounts();
+      return;
+    }
+    var html = "", last = "";
+    list.forEach(function(c){
+      if (!q){
+        var L = stripAccents(c.nome.trim().charAt(0)).toUpperCase();
+        if (!/[A-Z]/.test(L)) L = "#";
+        if (L !== last){ html += '<div class="letter">' + L + '</div>'; last = L; }
+      }
+      html += '<div class="contact">' +
+        '<div class="contact-main"><div class="contact-name">' + escapeHtml(c.nome) + '</div>' +
+          (c.observacao ? '<div class="contact-obs">' + escapeHtml(c.observacao) + '</div>' : '') + '</div>' +
+        '<div class="contact-nums">' + (c.telefones || []).map(function(t){
+          return '<button class="num" data-copy="' + escapeHtml(digitsOf(t) || t) + '" data-label="' + escapeHtml(formatNum(t)) + '" title="Copiar número">' + escapeHtml(formatNum(t)) + COPY_ICON + '</button>';
+        }).join("") + '</div>' +
+        (canEditContato(c) ? '<div class="contact-actions">' +
+          '<button class="icon-btn" data-cedit="' + escapeHtml(c.id) + '" aria-label="Editar ' + escapeHtml(c.nome) + '" title="Editar">' + EDIT_ICON + '</button>' +
+          '<button class="icon-btn" data-cdel="' + escapeHtml(c.id) + '" aria-label="Excluir ' + escapeHtml(c.nome) + '" title="Excluir">' + TRASH_ICON + '</button>' +
+        '</div>' : '') +
+      '</div>';
+    });
+    wrap.innerHTML = html;
+    wrap.querySelectorAll("[data-copy]").forEach(function(b){
+      b.addEventListener("click", function(){ copyText(b.getAttribute("data-copy"), "Número copiado: " + b.getAttribute("data-label")); });
+    });
+    wrap.querySelectorAll("[data-cedit]").forEach(function(b){ b.addEventListener("click", function(){ openContactForm(b.getAttribute("data-cedit")); }); });
+    wrap.querySelectorAll("[data-cdel]").forEach(function(b){ b.addEventListener("click", function(){ requestDeleteContato(b.getAttribute("data-cdel")); }); });
+    updateTabCounts();
+  }
+
+  function openContactForm(id){
+    var c = id ? findContato(id) : null;
+    if (c && !canEditContato(c)) return;
+    editingContactId = c ? c.id : null;
+    setError("contact-error", "");
+    var q = state.view === "contatos" ? state.query.trim() : "";
+    $("contact-modal-title").textContent = c ? "Editar contato" : "Novo contato";
+    $("c-name").value = c ? c.nome : (q && digitsOf(q).length < 3 ? q : "");
+    $("c-nums").value = c ? (c.telefones || []).map(formatNum).join(", ") : (digitsOf(q).length >= 4 ? q : "");
+    $("c-obs").value = c ? (c.observacao || "") : "";
+    $("c-note").textContent = c ? "A alteração vale para toda a equipe." : "Todos da equipe vão ver este contato. Você e os administradores podem editar depois.";
+    openModal("contact");
+    setTimeout(function(){ $("c-name").focus(); }, 50);
+  }
+
+  async function saveContato(e){
+    e.preventDefault();
+    setError("contact-error", "");
+    var nome = $("c-name").value.trim();
+    var parts = $("c-nums").value.split(/[,;\n\/]+/).map(function(s){ return s.trim(); }).filter(Boolean);
+    var nums = parts.map(function(s){ var d = digitsOf(s); return (d.length >= 3 && d.length <= 16 && !/[A-Za-zÀ-ÿ]/.test(s)) ? d : null; });
+    if (!nome){ setError("contact-error", "Informe o nome ou setor."); return; }
+    if (!nums.length || nums.some(function(n){ return n === null; })){ setError("contact-error", "Informe número(s) válido(s): só dígitos, traços, espaços ou parênteses. Separe vários por vírgula."); return; }
+    nums = nums.filter(function(n, i){ return nums.indexOf(n) === i; });
+    if (nums.length > 10){ setError("contact-error", "No máximo 10 números por contato."); return; }
+    var dup = state.contatos.filter(function(c){
+      return c.id !== editingContactId && (c.telefones || []).some(function(t){ return nums.indexOf(digitsOf(t)) !== -1; });
+    })[0];
+    if (dup){ setError("contact-error", 'Esse número já está salvo em "' + dup.nome + '".'); return; }
+    var btn = $("contact-save"); busy(btn, true, "Salvando…");
+    try{
+      var row = { nome: nome, telefones: nums, observacao: $("c-obs").value.trim() };
+      var editing = !!editingContactId;
+      var r = editing
+        ? await sb.from("console_contatos").update(row).eq("id", editingContactId).select("id")
+        : await sb.from("console_contatos").insert(Object.assign({ criado_por: state.session.user.id }, row)).select("id");
+      if (r.error) throw r.error;
+      if (!r.data || !r.data.length) throw new Error("permission denied");
+      closeModal("contact");
+      if (!editing && state.view === "contatos"){ state.query = ""; $("search").value = ""; }
+      await loadContatos();
+      showToast(editing ? "Contato atualizado para a equipe" : "Contato salvo para toda a equipe");
+    }catch(err){ setError("contact-error", friendlyError(err)); }
+    finally{ busy(btn, false); }
+  }
+
+  function requestDeleteContato(id){
+    var c = findContato(id); if (!c) return;
+    askConfirm("Excluir contato?", 'O contato "' + c.nome + '" será removido para toda a equipe.', "Excluir", async function(){
+      var r = await sb.from("console_contatos").delete().eq("id", id).select("id");
+      if (r.error) throw r.error;
+      if (!r.data || !r.data.length) throw new Error("permission denied");
+      await loadContatos();
+      showToast("Contato excluído");
     });
   }
 
@@ -1339,6 +1546,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       app: "console-de-atendimento", version: 2, exportedAt: new Date().toISOString(),
       usuario: state.me ? state.me.email : null,
       respostas: state.respostas.map(function(n){ return { title: n.title, category: n.category, tags: n.tags, content: n.content, updated: n.updated }; }),
+      contatos: state.contatos.map(function(c){ return { nome: c.nome, telefones: c.telefones, observacao: c.observacao }; }),
       pad: state.pad
     };
     downloadFile("console-atendimento-meus-dados-" + todayIso() + ".json", JSON.stringify(data, null, 2), "application/json");
@@ -1519,25 +1727,29 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   function setView(v, opts){
     opts = opts || {};
     if (v === "equipe" && !isAdmin()) v = "respostas";
-    if (["respostas", "bloco", "equipe"].indexOf(v) === -1) v = "respostas";
+    if (VIEWS.indexOf(v) === -1) v = "respostas";
     state.view = v;
     try{ localStorage.setItem(VIEW_KEY, v); }catch(e){}
-    $("view-respostas").hidden = v !== "respostas";
-    $("view-bloco").hidden = v !== "bloco";
-    $("view-equipe").hidden = v !== "equipe";
-    ["respostas", "bloco", "equipe"].forEach(function(x){ $("tab-" + x).setAttribute("aria-selected", String(v === x)); });
+    VIEWS.forEach(function(x){
+      $("view-" + x).hidden = v !== x;
+      $("tab-" + x).setAttribute("aria-selected", String(v === x));
+    });
     if (!opts.keepQuery){ state.query = ""; $("search").value = ""; }
     $("search").parentElement.hidden = v === "equipe";
-    $("btn-new").hidden = !isAdmin() || v === "equipe";
-    $("search").placeholder = v === "bloco" ? "Buscar nos dias do seu bloco de notas…" : "Buscar respostas por título, texto, telefone ou tag…";
+    $("btn-new").hidden = v === "contatos" ? false : !(isAdmin() && v === "respostas");
+    $("btn-new-label").textContent = v === "contatos" ? "Novo contato" : "Nova resposta";
+    $("search").placeholder = v === "bloco" ? "Buscar nos dias do seu bloco de notas…"
+      : v === "contatos" ? "Buscar contato por nome, setor ou número…"
+      : "Buscar respostas por título, texto, telefone ou tag…";
     if (v === "bloco"){ if (!state.padDate) state.padDate = todayIso(); loadPadEditor(!!opts.focus); }
     else if (v === "equipe"){ renderTeam(); loadMembers(); }
+    else if (v === "contatos"){ renderContatos(); if (opts.focus) $("search").focus(); }
     else { renderRespostas(); }
     try{ history.replaceState(null, "", "#" + v); }catch(e){}
   }
 
   /* ---------- Overlays ---------- */
-  var MODALS = { form: "form-modal-wrap", confirm: "confirm-modal-wrap", member: "member-modal-wrap", secret: "secret-modal-wrap", pw: "pw-modal-wrap" };
+  var MODALS = { form: "form-modal-wrap", contact: "contact-modal-wrap", confirm: "confirm-modal-wrap", member: "member-modal-wrap", secret: "secret-modal-wrap", pw: "pw-modal-wrap" };
   function openModal(name){ $(MODALS[name]).classList.add("show"); syncOverlay(); }
   function closeModal(name){
     $(MODALS[name]).classList.remove("show"); syncOverlay();
@@ -1548,7 +1760,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   function syncOverlay(){ $("overlay").classList.toggle("show", anyPanelOpen()); }
   function closeTop(){
     var open = openModalNames();
-    var order = ["confirm", "secret", "pw", "member", "form"];
+    var order = ["confirm", "secret", "pw", "member", "contact", "form"];
     for (var i = 0; i < order.length; i++){ if (open.indexOf(order[i]) !== -1){ closeModal(order[i]); return true; } }
     if ($("drawer").classList.contains("open")){ closeDetail(); return true; }
     return false;
@@ -1576,12 +1788,15 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("blocked-logout").addEventListener("click", doLogout);
 
     $("tab-respostas").addEventListener("click", function(){ setView("respostas"); });
+    $("tab-contatos").addEventListener("click", function(){ setView("contatos", { focus: true }); });
     $("tab-bloco").addEventListener("click", function(){ setView("bloco", { focus: true }); });
     $("tab-equipe").addEventListener("click", function(){ setView("equipe"); });
 
     $("search").addEventListener("input", function(e){
       state.query = e.target.value;
-      if (state.view === "bloco") renderDays(); else renderRespostas();
+      if (state.view === "bloco") renderDays();
+      else if (state.view === "contatos") renderContatos();
+      else renderRespostas();
     });
     $("search").addEventListener("keydown", function(e){
       if (e.key === "Enter" && state.view === "bloco"){
@@ -1589,9 +1804,15 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         var first = $("pad-days").querySelector(".day-item");
         if (first) selectPadDate(first.getAttribute("data-date"), true);
       }
+      if (e.key === "Enter" && state.view === "contatos" && state.query.trim()){
+        e.preventDefault();
+        var num = $("contacts").querySelector("[data-copy]");
+        if (num) num.click();
+      }
     });
 
-    $("btn-new").addEventListener("click", function(){ openForm(null); });
+    $("btn-new").addEventListener("click", function(){ if (state.view === "contatos") openContactForm(null); else openForm(null); });
+    $("contact-form").addEventListener("submit", saveContato);
     $("drawer-close").addEventListener("click", closeDetail);
     $("drawer-edit").addEventListener("click", function(){ var id = state.selectedId; closeDetail(); openForm(id); });
     $("drawer-delete").addEventListener("click", function(){ requestDeleteResposta(state.selectedId); });
@@ -1667,6 +1888,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       if ($("screen-app").hidden || !state.session) return;
       if (Date.now() - state.lastRespostasFetch > 60000){
         loadRespostas();
+        loadContatos();
         if (!Object.keys(padPending).length && document.activeElement !== $("pad-text")) loadPad();
         if (isAdmin()) loadMembers();
       }
