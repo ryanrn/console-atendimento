@@ -355,6 +355,23 @@
   .contact-actions .icon-btn{ width: 28px; height: 28px; }
   @media (hover: none){ .contact-actions{ opacity: 1; } }
 
+  /* ---------- Histórico & saudação ---------- */
+  .modal.wide{ max-width: 640px; }
+  .hist-list{ display: flex; flex-direction: column; gap: 10px; }
+  .hist-item{ border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px; background: var(--bg); }
+  .hist-meta{ font-size: 12px; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .hist-title{ font-weight: 700; font-size: 14px; margin: 0 0 6px; }
+  .hist-preview{ font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0 0 8px; }
+  .hist-item details summary{ cursor: pointer; font-size: 12.5px; color: var(--accent-strong); font-weight: 600; }
+  .hist-content{ white-space: pre-wrap; font-size: 13px; line-height: 1.6; margin-top: 8px; }
+  .hist-actions{ display: flex; justify-content: flex-end; margin-top: 10px; }
+  .hist-empty{ color: var(--text-muted); font-size: 13.5px; text-align: center; padding: 18px 0; }
+  .greet-note{ display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--accent-strong); background: var(--accent-soft); border-radius: 999px; padding: 3px 9px; font-family: "Public Sans", sans-serif; }
+  .status-row{ display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .status-row .status-line{ margin-bottom: 0; }
+  .link-btn{ border: 0; background: transparent; color: var(--text-muted); font-size: 12.5px; font-weight: 600; padding: 4px 8px; border-radius: 6px; }
+  .link-btn:hover{ color: var(--accent-strong); background: var(--accent-soft); }
+
   /* ---------- Team ---------- */
   .team-head{ display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
   .team-head h2{ margin: 0; font-size: 18px; letter-spacing: -0.01em; }
@@ -579,7 +596,10 @@
 
   <section id="view-respostas">
     <div class="filters" id="filters" role="group" aria-label="Filtrar por categoria"></div>
-    <div class="status-line" id="status-count"></div>
+    <div class="status-row">
+      <div class="status-line" id="status-count"></div>
+      <button class="link-btn" id="btn-deleted" hidden>Excluídas recentemente</button>
+    </div>
     <div class="grid" id="grid"></div>
   </section>
 
@@ -634,7 +654,7 @@
     <div style="min-width:0;">
       <span class="cat-chip" id="drawer-cat"></span>
       <h2 id="drawer-title"></h2>
-      <div class="drawer-meta"><span class="mono" id="drawer-date"></span></div>
+      <div class="drawer-meta"><span class="mono" id="drawer-date"></span><span class="greet-note" id="drawer-greet" hidden></span></div>
     </div>
     <button class="icon-btn" id="drawer-close" aria-label="Fechar"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
   </div>
@@ -645,6 +665,7 @@
   <div class="drawer-actions">
     <button class="btn" id="drawer-copy">Copiar texto</button>
     <button class="btn" id="drawer-edit" hidden>Editar</button>
+    <button class="btn" id="drawer-history" hidden>Histórico</button>
     <button class="btn btn-danger" id="drawer-delete" hidden>Excluir</button>
   </div>
 </aside>
@@ -669,6 +690,7 @@
           <div class="field"><label for="f-tags">Tags (separadas por vírgula)</label><input type="text" id="f-tags" placeholder="Ex.: CPF, senha, SMS"></div>
         </div>
         <div class="field"><label for="f-content">Texto completo</label><textarea id="f-content" required placeholder="Cole ou escreva o texto da resposta…"></textarea></div>
+        <p class="form-note">Saudação automática: se o texto começar com "Bom dia", "Boa tarde" ou "Boa noite" — ou tiver <span class="mono">{saudacao}</span> — o console ajusta ao horário na hora de copiar.</p>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn" data-close="form">Cancelar</button>
@@ -698,6 +720,20 @@
         <button type="submit" class="btn btn-primary" id="contact-save">Salvar contato</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Histórico de versões -->
+<div class="modal-wrap" id="hist-modal-wrap">
+  <div class="modal wide">
+    <div class="modal-head">
+      <h2 id="hist-title">Histórico</h2>
+      <button class="icon-btn" data-close="hist" aria-label="Fechar"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <p id="hist-lead"></p>
+      <div class="hist-list" id="hist-list"></div>
+    </div>
   </div>
 </div>
 
@@ -848,6 +884,30 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   function shortDay(iso){ var d = parseIso(iso); return WEEKDAYS_SHORT[d.getDay()] + ", " + pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1); }
   function monthLabel(iso){ var d = parseIso(iso); return cap(MONTHS[d.getMonth()]) + " " + d.getFullYear(); }
   function timeHM(ms){ var d = new Date(ms); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); }
+  /* Saudação automática: ajusta "Bom dia/Boa tarde/Boa noite" do início do texto e {saudacao} ao horário. */
+  function saudacaoAgora(d){
+    var h = (d || new Date()).getHours();
+    return h >= 5 && h < 12 ? "Bom dia" : (h >= 12 && h < 18 ? "Boa tarde" : "Boa noite");
+  }
+  function aplicarSaudacao(text, d){
+    var g = saudacaoAgora(d), auto = false;
+    var out = String(text || "").replace(/^(\s*(?:(?:olá|ola|oi)\s*[,!]?\s*)?)(bom dia|boa tarde|boa noite)(?![a-zà-ú])/i, function(m, pre, sau){
+      auto = true;
+      return pre + (/^[A-ZÀ-Ú]/.test(sau) ? g : g.toLowerCase());
+    });
+    out = out.replace(/\{\s*sauda[cç][aã]o\s*\}/gi, function(m, offset, str){
+      auto = true;
+      var before = str.slice(0, offset);
+      var startOfSentence = before.trim() === "" || /([.!?]\s+|\n\s*)$/.test(before);
+      return startOfSentence ? g : g.toLowerCase();
+    });
+    return { text: out, auto: auto, saudacao: g };
+  }
+  function fmtDateTime(iso){
+    var d = new Date(iso);
+    return pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1) + "/" + d.getFullYear() + " às " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  }
+
   function summarize(content, max){ max = max || 150; var flat = String(content || "").replace(/\s+/g, " ").trim(); return flat.length > max ? flat.slice(0, max).trim() + "…" : flat; }
   function wordCount(text){ var m = String(text).trim().match(/\S+/g); return m ? m.length : 0; }
   function plural(n, one, many){ return n + " " + (n === 1 ? one : many); }
@@ -1048,6 +1108,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("pad-to-answer").hidden = !isAdmin();
     $("drawer-edit").hidden = !isAdmin();
     $("drawer-delete").hidden = !isAdmin();
+    $("drawer-history").hidden = !isAdmin();
+    $("btn-deleted").hidden = !isAdmin();
     state.padDate = todayIso();
     await Promise.all([loadRespostas(), loadContatos(), loadPad(), isAdmin() ? loadMembers() : Promise.resolve()]);
     var hash = (location.hash || "").replace("#", "");
@@ -1133,7 +1195,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         '</div>' : '') +
         '<div class="card-top">' + catChipHtml(n.category) + '<span class="card-date">' + formatDate(n.updated) + '</span></div>' +
         '<h3 class="card-title">' + escapeHtml(n.title) + '</h3>' +
-        '<p class="card-summary">' + escapeHtml(summarize(n.content)) + '</p>' +
+        '<p class="card-summary">' + escapeHtml(summarize(aplicarSaudacao(n.content).text)) + '</p>' +
         '<div class="card-tags">' + (n.tags || []).slice(0, 4).map(function(t){ return '<span class="tag">' + escapeHtml(t) + '</span>'; }).join("") + '</div>' +
       '</article>';
     }).join("");
@@ -1163,7 +1225,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("drawer-cat").outerHTML = catChipHtml(n.category, "drawer-cat");
     $("drawer-title").textContent = n.title;
     $("drawer-date").textContent = "Atualizado em " + formatDate(n.updated);
-    $("drawer-content").textContent = n.content;
+    var s = aplicarSaudacao(n.content);
+    $("drawer-content").textContent = s.text;
+    $("drawer-greet").hidden = !s.auto;
+    $("drawer-greet").textContent = "Saudação automática: " + s.saudacao;
     $("drawer-tags").innerHTML = (n.tags || []).map(function(t){ return '<span class="tag">' + escapeHtml(t) + '</span>'; }).join("");
     $("drawer").classList.add("open"); $("drawer").setAttribute("aria-hidden", "false");
     syncOverlay();
@@ -1222,14 +1287,93 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
   function requestDeleteResposta(id){
     var n = findResposta(id); if (!n) return;
-    askConfirm("Excluir resposta?", 'A resposta "' + n.title + '" será removida para toda a equipe. Esta ação não pode ser desfeita.', "Excluir", async function(){
+    askConfirm("Excluir resposta?", 'A resposta "' + n.title + '" será removida para toda a equipe. Se precisar, dá para restaurar em "Excluídas recentemente".', "Excluir", async function(){
       var r = await sb.from("console_respostas").delete().eq("id", id).select("id");
       if (r.error) throw r.error;
       if (!r.data || !r.data.length) throw new Error("permission denied");
       if (state.selectedId === id) closeDetail();
       await loadRespostas();
-      showToast("Resposta excluída");
+      showToast("Resposta excluída — dá para restaurar em \"Excluídas recentemente\"");
     });
+  }
+
+  /* ---------- Histórico de versões ---------- */
+  var HIST_COLS = "id, resposta_id, acao, titulo, categoria, tags, conteudo, versao_de, alterado_por, alterado_em";
+  var histItems = [];
+
+  function memberName(uid){
+    if (!uid) return "sistema";
+    if (state.session && uid === state.session.user.id) return "você";
+    var m = state.members.filter(function(x){ return x.user_id === uid; })[0];
+    return m ? m.nome : "pessoa removida";
+  }
+
+  async function openHistory(id){
+    if (!isAdmin()) return;
+    var n = findResposta(id); if (!n) return;
+    $("hist-title").textContent = "Histórico — " + n.title;
+    $("hist-lead").textContent = "Versões anteriores desta resposta, da mais recente para a mais antiga. Restaurar não apaga nada: a versão atual também vai para o histórico.";
+    $("hist-list").innerHTML = '<div class="hist-empty">Carregando…</div>';
+    openModal("hist");
+    var r = await sb.from("console_respostas_historico").select(HIST_COLS).eq("resposta_id", id).order("alterado_em", { ascending: false }).limit(30);
+    if (r.error){ $("hist-list").innerHTML = '<div class="hist-empty">' + escapeHtml(friendlyError(r.error)) + '</div>'; return; }
+    histItems = r.data || [];
+    renderHistory("Esta resposta ainda não foi alterada desde que o histórico foi ativado.");
+  }
+
+  async function openDeleted(){
+    if (!isAdmin()) return;
+    $("hist-title").textContent = "Excluídas recentemente";
+    $("hist-lead").textContent = "Respostas que foram excluídas. Restaurar devolve a resposta para toda a equipe.";
+    $("hist-list").innerHTML = '<div class="hist-empty">Carregando…</div>';
+    openModal("hist");
+    var r = await sb.from("console_respostas_historico").select(HIST_COLS).eq("acao", "excluida").order("alterado_em", { ascending: false }).limit(60);
+    if (r.error){ $("hist-list").innerHTML = '<div class="hist-empty">' + escapeHtml(friendlyError(r.error)) + '</div>'; return; }
+    var seen = {};
+    histItems = (r.data || []).filter(function(h){
+      if (seen[h.resposta_id] || findResposta(h.resposta_id)) return false;
+      seen[h.resposta_id] = true; return true;
+    });
+    renderHistory("Nenhuma resposta excluída por aqui.");
+  }
+
+  function renderHistory(emptyMsg){
+    var list = $("hist-list");
+    if (!histItems.length){ list.innerHTML = '<div class="hist-empty">' + escapeHtml(emptyMsg) + '</div>'; return; }
+    list.innerHTML = histItems.map(function(h, i){
+      var what = h.acao === "excluida"
+        ? "Excluída em " + fmtDateTime(h.alterado_em) + " por " + escapeHtml(memberName(h.alterado_por))
+        : "Versão de " + (h.versao_de ? formatDate(h.versao_de) : "—") + " · substituída em " + fmtDateTime(h.alterado_em) + " por " + escapeHtml(memberName(h.alterado_por));
+      return '<div class="hist-item">' +
+        '<div class="hist-meta">' + catChipHtml(h.categoria) + '<span>' + what + '</span></div>' +
+        '<p class="hist-title">' + escapeHtml(h.titulo) + '</p>' +
+        '<p class="hist-preview">' + escapeHtml(summarize(h.conteudo, 140)) + '</p>' +
+        '<details><summary>Ver texto desta versão</summary><div class="hist-content">' + escapeHtml(h.conteudo) + '</div></details>' +
+        '<div class="hist-actions"><button class="btn btn-sm btn-primary" data-restore="' + i + '">' + (h.acao === "excluida" ? "Restaurar resposta" : "Restaurar esta versão") + '</button></div>' +
+      '</div>';
+    }).join("");
+    list.querySelectorAll("[data-restore]").forEach(function(b){
+      b.addEventListener("click", async function(){
+        var h = histItems[+b.getAttribute("data-restore")];
+        busy(b, true, "Restaurando…");
+        try{
+          await restoreVersion(h);
+          closeModal("hist");
+          if ($("drawer").classList.contains("open") && state.selectedId === h.resposta_id) openDetail(h.resposta_id);
+          showToast(h.acao === "excluida" ? "Resposta restaurada para toda a equipe" : "Versão restaurada — a anterior ficou no histórico");
+        }catch(err){ showToast(friendlyError(err)); busy(b, false); }
+      });
+    });
+  }
+
+  async function restoreVersion(h){
+    var row = { titulo: h.titulo, categoria: h.categoria, tags: h.tags || [], conteudo: h.conteudo };
+    var r = findResposta(h.resposta_id)
+      ? await sb.from("console_respostas").update(row).eq("id", h.resposta_id).select("id")
+      : await sb.from("console_respostas").insert(Object.assign({ id: h.resposta_id }, row)).select("id");
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.length) throw new Error("permission denied");
+    await loadRespostas();
   }
 
   /* ---------- Contatos ---------- */
@@ -1749,7 +1893,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   }
 
   /* ---------- Overlays ---------- */
-  var MODALS = { form: "form-modal-wrap", contact: "contact-modal-wrap", confirm: "confirm-modal-wrap", member: "member-modal-wrap", secret: "secret-modal-wrap", pw: "pw-modal-wrap" };
+  var MODALS = { form: "form-modal-wrap", contact: "contact-modal-wrap", hist: "hist-modal-wrap", confirm: "confirm-modal-wrap", member: "member-modal-wrap", secret: "secret-modal-wrap", pw: "pw-modal-wrap" };
   function openModal(name){ $(MODALS[name]).classList.add("show"); syncOverlay(); }
   function closeModal(name){
     $(MODALS[name]).classList.remove("show"); syncOverlay();
@@ -1760,7 +1904,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   function syncOverlay(){ $("overlay").classList.toggle("show", anyPanelOpen()); }
   function closeTop(){
     var open = openModalNames();
-    var order = ["confirm", "secret", "pw", "member", "contact", "form"];
+    var order = ["confirm", "secret", "pw", "member", "contact", "hist", "form"];
     for (var i = 0; i < order.length; i++){ if (open.indexOf(order[i]) !== -1){ closeModal(order[i]); return true; } }
     if ($("drawer").classList.contains("open")){ closeDetail(); return true; }
     return false;
@@ -1816,7 +1960,13 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("drawer-close").addEventListener("click", closeDetail);
     $("drawer-edit").addEventListener("click", function(){ var id = state.selectedId; closeDetail(); openForm(id); });
     $("drawer-delete").addEventListener("click", function(){ requestDeleteResposta(state.selectedId); });
-    $("drawer-copy").addEventListener("click", function(){ var n = findResposta(state.selectedId); if (n) copyText(n.content); });
+    $("drawer-copy").addEventListener("click", function(){
+      var n = findResposta(state.selectedId); if (!n) return;
+      var s = aplicarSaudacao(n.content);
+      copyText(s.text, s.auto ? "Texto copiado com \"" + s.saudacao + "\"" : "Texto copiado");
+    });
+    $("drawer-history").addEventListener("click", function(){ openHistory(state.selectedId); });
+    $("btn-deleted").addEventListener("click", openDeleted);
     $("f-category").addEventListener("change", function(e){
       $("f-new-category").classList.toggle("show", e.target.value === "__new__");
       if (e.target.value === "__new__") $("f-new-category").focus();
