@@ -493,6 +493,14 @@
   .links-head h2{font-size:18px;margin:0 0 4px}
   .links-head p{margin:0;font-size:12.5px;color:var(--text-muted);line-height:1.5}
   .links-filter{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+  .links-admin-actions,.links-cat-buttons{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .links-cats-list{display:flex;flex-direction:column;gap:8px}
+  .links-cat-line{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid var(--border);padding:10px;border-radius:10px}
+  .links-cat-line strong{display:block;font-size:13px}
+  .links-cat-line .form-note{display:block;margin-top:3px}
+  .links-cats-create,.links-cat-rename{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+  .links-cats-create .field,.links-cat-rename .field{flex:1;min-width:150px}
+  @media(max-width:560px){.links-cat-line{align-items:flex-start;flex-direction:column}}
   .useful-link{cursor:default;min-width:0}
   .useful-link .card-title{overflow-wrap:anywhere}
   .useful-link .link-url{font:12px 'JetBrains Mono',monospace;color:var(--accent-strong);overflow-wrap:anywhere;line-height:1.5;margin:0}
@@ -653,7 +661,7 @@
   <section id="view-links" hidden>
     <div class="links-head">
       <div><h2>Links úteis</h2><p>Endereços compartilhados com a equipe. Seus favoritos são individuais.</p></div>
-      <button class="btn btn-primary" id="links-add" hidden>+ Adicionar link</button>
+      <div class="links-admin-actions"><button class="btn btn-sm" id="links-manage-cats" hidden>Gerenciar categorias</button><button class="btn btn-primary" id="links-add" hidden>+ Adicionar link</button></div>
     </div>
     <div class="links-filter" id="links-filters" role="group" aria-label="Filtrar links por categoria"></div>
     <div class="status-line" id="links-status" aria-live="polite"></div>
@@ -773,11 +781,28 @@
         <div class="field"><label for="links-name">Nome do sistema ou site</label><input type="text" id="links-name" maxlength="120" required autocomplete="off"></div>
         <div class="field"><label for="links-url">URL (https:// ou http://)</label><input type="text" id="links-url" maxlength="2048" required autocomplete="off" placeholder="https://exemplo.com.br"></div>
         <div class="field"><label for="links-description">Descrição (opcional)</label><input type="text" id="links-description" maxlength="500" autocomplete="off"></div>
-        <div class="field"><label for="links-category">Categoria</label><select id="links-category"><option>Sistemas internos</option><option>Atendimento</option><option>Ferramentas</option><option>Outros</option></select></div>
+        <div class="field"><label for="links-category">Categoria</label><select id="links-category"></select><div id="links-new-category-wrap" class="new-cat-input"><label for="links-new-category">Nome da nova categoria</label><input type="text" id="links-new-category" maxlength="60" placeholder="Ex.: Laboratório" autocomplete="off"><p class="form-note" style="margin-top:6px">A categoria ficará disponível para toda a equipe.</p></div></div>
         <p class="form-note">Não cadastre senhas, tokens, links com credenciais ou dados de pacientes.</p>
       </div>
       <div class="modal-actions"><button type="button" class="btn" data-close="links">Cancelar</button><button type="submit" class="btn btn-primary" id="links-save">Salvar link</button></div>
     </form>
+  </div>
+</div>
+
+<!-- Gerenciamento de categorias de links (somente administradores) -->
+<div class="modal-wrap" id="links-cats-modal-wrap">
+  <div class="modal small">
+    <div class="modal-head"><h2>Categorias dos links</h2><button class="icon-btn" type="button" data-close="linksCats" aria-label="Fechar">×</button></div>
+    <div class="modal-body">
+      <p>As categorias são compartilhadas com toda a equipe. Renomear uma categoria também atualiza os links associados.</p>
+      <div class="form-error" id="links-cats-error" role="alert"></div>
+      <div id="links-cats-list" class="links-cats-list"></div>
+      <form id="links-cats-create" class="links-cats-create">
+        <div class="field"><label for="links-cats-name">Nova categoria</label><input type="text" id="links-cats-name" maxlength="60" autocomplete="off" placeholder="Ex.: Laboratório" required></div>
+        <button type="submit" class="btn btn-primary btn-sm" id="links-cats-create-btn">Adicionar</button>
+      </form>
+    </div>
+    <div class="modal-actions"><button class="btn" type="button" data-close="linksCats">Fechar</button></div>
   </div>
 </div>
 
@@ -899,7 +924,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   var state = {
     session: null, me: null,
     view: "respostas",
-    respostas: [], contatos: [], pad: {}, members: [], links: [], linkFavorites: new Set(), linkCategory: "all", linkEditingId: null, linksLastFetch: 0,
+    respostas: [], contatos: [], pad: {}, members: [], links: [], linkCategories: [], linkFavorites: new Set(), linkCategory: "all", linkEditingId: null, linksLastFetch: 0,
     query: "", activeCategory: "all",
     selectedId: null, editingId: null, padDate: null,
     lastRespostasFetch: 0
@@ -1133,7 +1158,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     await flushPad();
     if (state.session) removeLS(DRAFT_PREFIX + state.session.user.id);
     try{ await sb.auth.signOut(); }catch(e){}
-    state.session = null; state.me = null; state.respostas = []; state.contatos = []; state.pad = {}; state.members = []; state.links = []; state.linkFavorites = new Set(); state.linksLastFetch = 0;
+    state.session = null; state.me = null; state.respostas = []; state.contatos = []; state.pad = {}; state.members = []; state.links = []; state.linkCategories = []; state.linkFavorites = new Set(); state.linksLastFetch = 0;
     $("pad-text").value = "";
     closeAllPanels();
     $("user-menu").hidden = true;
@@ -1150,6 +1175,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("btn-new").hidden = !isAdmin();
     $("tab-equipe").hidden = !isAdmin();
     $("links-add").hidden = !isAdmin();
+    $("links-manage-cats").hidden = !isAdmin();
     $("pad-to-answer").hidden = !isAdmin();
     $("drawer-edit").hidden = !isAdmin();
     $("drawer-delete").hidden = !isAdmin();
@@ -1915,7 +1941,73 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
 
   /* ---------- Links úteis ---------- */
-  var LINK_CATS = ["Sistemas internos", "Atendimento", "Ferramentas", "Outros"];
+  var DEFAULT_LINK_CATS = ["Sistemas internos", "Atendimento", "Ferramentas", "Outros"];
+  function linkCats(){ return state.linkCategories.length ? state.linkCategories : DEFAULT_LINK_CATS; }
+  function fillLinkCategoryOptions(selected){
+    var sel = $("links-category");
+    sel.innerHTML = linkCats().map(function(c){return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>';}).join("") + (isAdmin() ? '<option value="__new__">＋ Nova categoria…</option>' : '');
+    sel.value = selected && linkCats().includes(selected) ? selected : linkCats()[0];
+    toggleLinkCategoryInput();
+  }
+  function toggleLinkCategoryInput(){
+    var active = $("links-category").value === "__new__";
+    $("links-new-category-wrap").classList.toggle("show", active);
+    $("links-new-category").required = active;
+    if (!active) $("links-new-category").value = "";
+  }
+  function validateCategoryName(v){
+    var name = String(v || "").trim().replace(/\s+/g, " ");
+    if (!name || name.length > 60 || /[<>]/.test(name)) throw Error("A categoria precisa ter de 1 a 60 caracteres, sem < ou >.");
+    return name;
+  }
+  async function createLinkCategory(name){
+    name = validateCategoryName(name);
+    if (linkCats().some(function(c){return c.toLocaleLowerCase("pt-BR") === name.toLocaleLowerCase("pt-BR");})) throw Error("Esta categoria já existe.");
+    var r = await sb.from("console_links_categorias").insert({nome:name}).select("nome");
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.length) throw Error("Sem permissão para cadastrar a categoria.");
+    state.linkCategories.push(name);
+    state.linkCategories.sort(function(a,b){return a.localeCompare(b,"pt-BR");});
+    return name;
+  }
+  function renderLinkCategoriesManager(){
+    var el = $("links-cats-list");
+    el.innerHTML = linkCats().map(function(c){
+      var count = state.links.filter(function(x){return x.categoria === c;}).length;
+      return '<div class="links-cat-line"><div><strong>'+escapeHtml(c)+'</strong><span class="form-note">'+plural(count,"link","links")+'</span></div><div class="links-cat-buttons"><button type="button" class="btn btn-sm" data-cat-rename="'+escapeHtml(c)+'">Renomear</button><button type="button" class="btn btn-sm btn-danger" data-cat-delete="'+escapeHtml(c)+'" '+(count ? 'disabled title="Categoria em uso"' : '')+'>Excluir</button></div></div>';
+    }).join("");
+    el.querySelectorAll('[data-cat-rename]').forEach(function(b){b.addEventListener("click",function(){startRenameLinkCategory(b.dataset.catRename);});});
+    el.querySelectorAll('[data-cat-delete]').forEach(function(b){b.addEventListener("click",function(){startDeleteLinkCategory(b.dataset.catDelete);});});
+  }
+  function startRenameLinkCategory(oldName){
+    var row = Array.from($("links-cats-list").children).find(function(x){return x.querySelector('[data-cat-rename]')?.dataset.catRename === oldName;});
+    if (!row) return;
+    row.innerHTML = '<form class="links-cat-rename"><div class="field"><label>Renomear categoria</label><input type="text" maxlength="60" required></div><button class="btn btn-primary btn-sm" type="submit">Salvar</button><button class="btn btn-sm" type="button">Cancelar</button></form>';
+    var form=row.querySelector("form"), input=row.querySelector("input"); input.value=oldName;input.focus();input.select();
+    form.querySelector('[type="button"]').addEventListener("click",renderLinkCategoriesManager);
+    form.addEventListener("submit",async function(e){
+      e.preventDefault();setError("links-cats-error", "");
+      try{
+        var name=validateCategoryName(input.value);
+        if(name===oldName){renderLinkCategoriesManager();return;}
+        if(linkCats().some(function(c){return c.toLocaleLowerCase("pt-BR")===name.toLocaleLowerCase("pt-BR");}))throw Error("Esta categoria já existe.");
+        var r=await sb.from("console_links_categorias").update({nome:name}).eq("nome",oldName).select("nome");
+        if(r.error)throw r.error;
+        if(!r.data || !r.data.length)throw Error("Sem permissão para renomear.");
+        await loadLinks();renderLinkCategoriesManager();showToast("Categoria renomeada");
+      }catch(err){setError("links-cats-error",friendlyError(err));}
+    });
+  }
+  function startDeleteLinkCategory(name){
+    if(state.links.some(function(x){return x.categoria===name;})){setError("links-cats-error","Esta categoria tem links. Mova os links para outra categoria primeiro.");return;}
+    closeModal("linksCats");
+    askConfirm("Excluir categoria?", "A categoria “"+name+"” será removida para toda a equipe.", "Excluir categoria", async function(){
+      var r=await sb.from("console_links_categorias").delete().eq("nome",name).select("nome");
+      if(r.error)throw r.error;
+      if(!r.data || !r.data.length)throw Error("Sem permissão para excluir a categoria.");
+      await loadLinks();showToast("Categoria excluída");
+    });
+  }
   var linksLoading = false;
   function validatedLinkUrl(value){
     var u;
@@ -1931,21 +2023,25 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       var uid = state.session.user.id;
       var results = await Promise.all([
         sb.from("console_links").select("id,nome,url,descricao,categoria,atualizado_em").order("nome"),
-        sb.from("console_links_favoritos").select("link_id").eq("user_id", uid)
+        sb.from("console_links_favoritos").select("link_id").eq("user_id", uid),
+        sb.from("console_links_categorias").select("nome").order("nome")
       ]);
       if (results[0].error) throw results[0].error;
       if (results[1].error) throw results[1].error;
+      if (results[2].error) throw results[2].error;
       if (!state.session || state.session.user.id !== uid) return;
       state.links = results[0].data || [];
+      state.linkCategories = (results[2].data || []).map(function(x){return x.nome;});
       state.linkFavorites = new Set((results[1].data || []).map(function(x){ return x.link_id; }));
       state.linksLastFetch = Date.now();
       renderLinks(); updateTabCounts();
+      if ($("links-cats-modal-wrap").classList.contains("show")) renderLinkCategoriesManager();
     }catch(err){ if (state.view === "links") $("links-status").textContent = "Não foi possível carregar links. Confira se a migração SQL foi aplicada. " + friendlyError(err); }
     finally{ linksLoading = false; }
   }
   function renderLinks(){
     var filters = $("links-filters");
-    var categories = ["all", "favorites"].concat(LINK_CATS);
+    var categories = ["all", "favorites"].concat(linkCats());
     filters.innerHTML = categories.map(function(c){
       var name = c === "all" ? "Todos" : c === "favorites" ? "★ Favoritos" : c;
       return '<button type="button" class="chip" data-linkcat="' + escapeHtml(c) + '" aria-pressed="' + (state.linkCategory === c) + '">' + escapeHtml(name) + '</button>';
@@ -2009,7 +2105,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("links-name").value = x ? x.nome : "";
     $("links-url").value = x ? x.url : "";
     $("links-description").value = x ? x.descricao || "" : "";
-    $("links-category").value = x ? x.categoria : LINK_CATS[0];
+    fillLinkCategoryOptions(x ? x.categoria : null);
+    $("links-new-category").value = "";
     setError("links-error", "");
     openModal("links"); setTimeout(function(){ $("links-name").focus(); },50);
   }
@@ -2020,7 +2117,12 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     try{
       var nome = $("links-name").value.trim(), url = validatedLinkUrl($("links-url").value);
       var descricao = $("links-description").value.trim() || null, categoria = $("links-category").value;
-      if (!nome || nome.length > 120 || (descricao && descricao.length > 500) || !LINK_CATS.includes(categoria)) throw Error("Verifique os campos do formulário.");
+      if (categoria === "__new__") {
+        categoria = validateCategoryName($("links-new-category").value);
+        // Criar a categoria antes de salvar o link; RLS confirma permissões no servidor.
+        if (!linkCats().includes(categoria)) categoria = await createLinkCategory(categoria);
+      }
+      if (!nome || nome.length > 120 || (descricao && descricao.length > 500) || !linkCats().includes(categoria)) throw Error("Verifique os campos do formulário.");
       var record = {nome:nome,url:url,descricao:descricao,categoria:categoria};
       busy(btn,true,"Salvando…");
       var r = state.linkEditingId ? await sb.from("console_links").update(record).eq("id",state.linkEditingId).select("id")
@@ -2059,7 +2161,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   }
 
   /* ---------- Overlays ---------- */
-  var MODALS = { form: "form-modal-wrap", contact: "contact-modal-wrap", hist: "hist-modal-wrap", confirm: "confirm-modal-wrap", member: "member-modal-wrap", secret: "secret-modal-wrap", pw: "pw-modal-wrap", links: "links-modal-wrap" };
+  var MODALS = { form: "form-modal-wrap", contact: "contact-modal-wrap", hist: "hist-modal-wrap", confirm: "confirm-modal-wrap", member: "member-modal-wrap", secret: "secret-modal-wrap", pw: "pw-modal-wrap", links: "links-modal-wrap", linksCats: "links-cats-modal-wrap" };
   function openModal(name){ $(MODALS[name]).classList.add("show"); syncOverlay(); }
   function closeModal(name){
     $(MODALS[name]).classList.remove("show"); syncOverlay();
@@ -2070,7 +2172,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   function syncOverlay(){ $("overlay").classList.toggle("show", anyPanelOpen()); }
   function closeTop(){
     var open = openModalNames();
-    var order = ["confirm", "secret", "pw", "member", "contact", "links", "hist", "form"];
+    var order = ["confirm", "secret", "pw", "member", "contact", "linksCats", "links", "hist", "form"];
     for (var i = 0; i < order.length; i++){ if (open.indexOf(order[i]) !== -1){ closeModal(order[i]); return true; } }
     if ($("drawer").classList.contains("open")){ closeDetail(); return true; }
     return false;
@@ -2103,6 +2205,15 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("tab-equipe").addEventListener("click", function(){ setView("equipe"); });
     $("tab-links").addEventListener("click", function(){ setView("links", { focus: true }); });
     $("links-add").addEventListener("click", function(){ openLinksForm(null); });
+    $("links-category").addEventListener("change",toggleLinkCategoryInput);
+    $("links-manage-cats").addEventListener("click",function(){if(!isAdmin())return;setError("links-cats-error","");renderLinkCategoriesManager();openModal("linksCats");});
+    $("links-cats-create").addEventListener("submit",async function(e){
+      e.preventDefault();if(!isAdmin())return;setError("links-cats-error","");
+      var button=$("links-cats-create-btn");busy(button,true,"Salvando…");
+      try{await createLinkCategory($("links-cats-name").value);$("links-cats-name").value="";renderLinkCategoriesManager();renderLinks();showToast("Categoria criada para a equipe");}
+      catch(err){setError("links-cats-error",friendlyError(err));}
+      finally{busy(button,false);}
+    });
     $("links-form").addEventListener("submit", saveLink);
 
     $("search").addEventListener("input", function(e){
