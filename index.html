@@ -487,6 +487,19 @@
     #pad-text{ padding: 12px 14px 20px; background-position: 0 12px; }
     .user-btn .uname{ display: none; }
   }
+
+  /* ---------- Links úteis ---------- */
+  .links-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .links-head h2{font-size:18px;margin:0 0 4px}
+  .links-head p{margin:0;font-size:12.5px;color:var(--text-muted);line-height:1.5}
+  .links-filter{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+  .useful-link{cursor:default;min-width:0}
+  .useful-link .card-title{overflow-wrap:anywhere}
+  .useful-link .link-url{font:12px 'JetBrains Mono',monospace;color:var(--accent-strong);overflow-wrap:anywhere;line-height:1.5;margin:0}
+  .useful-link .link-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:auto}
+  .useful-link .link-favorite{margin-left:auto}
+  .useful-link .link-favorite[aria-pressed="true"]{color:var(--warn);border-color:var(--warn)}
+  @media(max-width:560px){.useful-link .link-actions .btn{flex:1 1 auto}}
 </style>
 </head>
 <body>
@@ -577,6 +590,7 @@
       <button class="tab" role="tab" id="tab-contatos" aria-selected="false">Contatos <span class="count" id="tab-count-contatos"></span></button>
       <button class="tab" role="tab" id="tab-bloco" aria-selected="false">Bloco de notas <span class="count" id="tab-count-bloco"></span></button>
       <button class="tab" role="tab" id="tab-equipe" aria-selected="false" hidden>Equipe <span class="count" id="tab-count-equipe"></span></button>
+      <button class="tab" role="tab" id="tab-links" aria-selected="false">Links úteis <span class="count" id="tab-count-links"></span></button>
     </div>
     <div class="viewbar-right">
       <span class="sync-dot" id="sync-indicator"><i></i><span>Sincronizado</span></span>
@@ -633,6 +647,17 @@
         <textarea id="pad-text" spellcheck="true" placeholder="Comece a escrever… tudo é salvo automaticamente na sua conta."></textarea>
       </div>
     </div>
+  </section>
+
+
+  <section id="view-links" hidden>
+    <div class="links-head">
+      <div><h2>Links úteis</h2><p>Endereços compartilhados com a equipe. Seus favoritos são individuais.</p></div>
+      <button class="btn btn-primary" id="links-add" hidden>+ Adicionar link</button>
+    </div>
+    <div class="links-filter" id="links-filters" role="group" aria-label="Filtrar links por categoria"></div>
+    <div class="status-line" id="links-status" aria-live="polite"></div>
+    <div class="grid" id="links-grid"></div>
   </section>
 
   <section id="view-equipe" hidden>
@@ -734,6 +759,25 @@
       <p id="hist-lead"></p>
       <div class="hist-list" id="hist-list"></div>
     </div>
+  </div>
+</div>
+
+
+<!-- Links úteis: criar/editar (somente administradores) -->
+<div class="modal-wrap" id="links-modal-wrap">
+  <div class="modal small">
+    <div class="modal-head"><h2 id="links-modal-title">Adicionar link</h2><button class="icon-btn" data-close="links" aria-label="Fechar">×</button></div>
+    <form id="links-form" novalidate>
+      <div class="modal-body">
+        <div class="form-error" id="links-error" role="alert"></div>
+        <div class="field"><label for="links-name">Nome do sistema ou site</label><input type="text" id="links-name" maxlength="120" required autocomplete="off"></div>
+        <div class="field"><label for="links-url">URL (https:// ou http://)</label><input type="text" id="links-url" maxlength="2048" required autocomplete="off" placeholder="https://exemplo.com.br"></div>
+        <div class="field"><label for="links-description">Descrição (opcional)</label><input type="text" id="links-description" maxlength="500" autocomplete="off"></div>
+        <div class="field"><label for="links-category">Categoria</label><select id="links-category"><option>Sistemas internos</option><option>Atendimento</option><option>Ferramentas</option><option>Outros</option></select></div>
+        <p class="form-note">Não cadastre senhas, tokens, links com credenciais ou dados de pacientes.</p>
+      </div>
+      <div class="modal-actions"><button type="button" class="btn" data-close="links">Cancelar</button><button type="submit" class="btn btn-primary" id="links-save">Salvar link</button></div>
+    </form>
   </div>
 </div>
 
@@ -855,7 +899,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   var state = {
     session: null, me: null,
     view: "respostas",
-    respostas: [], contatos: [], pad: {}, members: [],
+    respostas: [], contatos: [], pad: {}, members: [], links: [], linkFavorites: new Set(), linkCategory: "all", linkEditingId: null, linksLastFetch: 0,
     query: "", activeCategory: "all",
     selectedId: null, editingId: null, padDate: null,
     lastRespostasFetch: 0
@@ -1089,7 +1133,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     await flushPad();
     if (state.session) removeLS(DRAFT_PREFIX + state.session.user.id);
     try{ await sb.auth.signOut(); }catch(e){}
-    state.session = null; state.me = null; state.respostas = []; state.contatos = []; state.pad = {}; state.members = [];
+    state.session = null; state.me = null; state.respostas = []; state.contatos = []; state.pad = {}; state.members = []; state.links = []; state.linkFavorites = new Set(); state.linksLastFetch = 0;
     $("pad-text").value = "";
     closeAllPanels();
     $("user-menu").hidden = true;
@@ -1105,6 +1149,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("menu-email").textContent = state.me.email + (isAdmin() ? " · administrador" : " · membro");
     $("btn-new").hidden = !isAdmin();
     $("tab-equipe").hidden = !isAdmin();
+    $("links-add").hidden = !isAdmin();
     $("pad-to-answer").hidden = !isAdmin();
     $("drawer-edit").hidden = !isAdmin();
     $("drawer-delete").hidden = !isAdmin();
@@ -1215,6 +1260,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     var n = padDays().length;
     $("tab-count-bloco").textContent = n || "";
     $("tab-count-equipe").textContent = state.members.length || "";
+    $("tab-count-links").textContent = state.links.length || "";
   }
 
   function findResposta(id){ return state.respostas.filter(function(x){ return x.id === id; })[0]; }
@@ -1377,7 +1423,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   }
 
   /* ---------- Contatos ---------- */
-  var VIEWS = ["respostas", "contatos", "bloco", "equipe"];
+  var VIEWS = ["respostas", "contatos", "bloco", "equipe", "links"];
   var COPY_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M3 10.5V3.8A1.3 1.3 0 014.3 2.5H10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
   var EDIT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.3 2.3a1.5 1.5 0 012.1 2.1L5 12.8l-2.9.7.7-2.9 8.5-8.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>';
   var TRASH_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6.5 5V3.5h3V5M4.5 5l.6 8.2a1 1 0 001 .8h3.8a1 1 0 001-.8L11.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -1867,6 +1913,125 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     openModal("secret");
   }
 
+
+  /* ---------- Links úteis ---------- */
+  var LINK_CATS = ["Sistemas internos", "Atendimento", "Ferramentas", "Outros"];
+  var linksLoading = false;
+  function validatedLinkUrl(value){
+    var u;
+    try { u = new URL(String(value).trim()); } catch(e){ throw new Error("Informe uma URL completa e válida."); }
+    if (!/^(https?:)$/.test(u.protocol) || !u.hostname || u.username || u.password || /[\s<>]/.test(value)) throw new Error("Use uma URL http(s) sem credenciais.");
+    if (/(?:[?&#]|%3[f&])(?:access_token|refresh_token|id_token|api_key|apikey|token|password|senha|secret|authorization|code)=/i.test(value)) throw new Error("Remova tokens, senhas e credenciais da URL.");
+    return u.href;
+  }
+  async function loadLinks(){
+    if (!state.session || linksLoading) return;
+    linksLoading = true;
+    try{
+      var uid = state.session.user.id;
+      var results = await Promise.all([
+        sb.from("console_links").select("id,nome,url,descricao,categoria,atualizado_em").order("nome"),
+        sb.from("console_links_favoritos").select("link_id").eq("user_id", uid)
+      ]);
+      if (results[0].error) throw results[0].error;
+      if (results[1].error) throw results[1].error;
+      if (!state.session || state.session.user.id !== uid) return;
+      state.links = results[0].data || [];
+      state.linkFavorites = new Set((results[1].data || []).map(function(x){ return x.link_id; }));
+      state.linksLastFetch = Date.now();
+      renderLinks(); updateTabCounts();
+    }catch(err){ if (state.view === "links") $("links-status").textContent = "Não foi possível carregar links. Confira se a migração SQL foi aplicada. " + friendlyError(err); }
+    finally{ linksLoading = false; }
+  }
+  function renderLinks(){
+    var filters = $("links-filters");
+    var categories = ["all", "favorites"].concat(LINK_CATS);
+    filters.innerHTML = categories.map(function(c){
+      var name = c === "all" ? "Todos" : c === "favorites" ? "★ Favoritos" : c;
+      return '<button type="button" class="chip" data-linkcat="' + escapeHtml(c) + '" aria-pressed="' + (state.linkCategory === c) + '">' + escapeHtml(name) + '</button>';
+    }).join("");
+    filters.querySelectorAll("[data-linkcat]").forEach(function(b){ b.addEventListener("click", function(){state.linkCategory = b.dataset.linkcat;renderLinks();}); });
+    var q = stripAccents(state.query.trim().toLowerCase());
+    var list = state.links.filter(function(x){
+      if (state.linkCategory === "favorites" && !state.linkFavorites.has(x.id)) return false;
+      if (state.linkCategory !== "all" && state.linkCategory !== "favorites" && state.linkCategory !== x.categoria) return false;
+      return !q || stripAccents([x.nome,x.url,x.descricao].join(" ").toLowerCase()).includes(q);
+    }).sort(function(a,b){
+      var diff = Number(state.linkFavorites.has(b.id)) - Number(state.linkFavorites.has(a.id));
+      return diff || a.nome.localeCompare(b.nome, "pt-BR");
+    });
+    $("links-status").textContent = plural(list.length, "link encontrado", "links encontrados");
+    $("links-grid").innerHTML = list.length ? list.map(function(x){
+      var fav = state.linkFavorites.has(x.id), url;
+      try{ url = validatedLinkUrl(x.url); }catch(e){ url = ""; }
+      return '<article class="card useful-link"><div class="card-top"><span class="cat-chip" style="--h:' + hueFor(x.categoria) + '"><span class="dot"></span>' + escapeHtml(x.categoria) + '</span></div>' +
+        '<h3 class="card-title">' + escapeHtml(x.nome) + '</h3>' +
+        (x.descricao ? '<p class="card-summary">' + escapeHtml(x.descricao) + '</p>' : '') +
+        '<p class="link-url">' + escapeHtml(x.url) + '</p>' +
+        '<div class="link-actions"><button class="btn btn-sm btn-primary" data-linkaction="open" data-id="' + x.id + '"' + (!url ? ' disabled' : '') + '>Abrir ↗</button>' +
+        '<button class="btn btn-sm" data-linkaction="copy" data-id="' + x.id + '">Copiar</button>' +
+        '<button class="btn btn-sm link-favorite" data-linkaction="favorite" data-id="' + x.id + '" aria-pressed="' + fav + '" aria-label="' + (fav ? 'Remover favorito' : 'Adicionar favorito') + '" title="' + (fav ? 'Remover favorito' : 'Adicionar favorito') + '">' + (fav ? '★' : '☆') + '</button>' +
+        (isAdmin() ? '<button class="btn btn-sm" data-linkaction="edit" data-id="' + x.id + '">Editar</button><button class="btn btn-sm btn-danger" data-linkaction="delete" data-id="' + x.id + '">Excluir</button>' : '') + '</div></article>';
+    }).join("") : '<div class="empty-state"><h3>Nenhum link encontrado</h3><p>Experimente outra pesquisa ou categoria.</p></div>';
+    $("links-grid").querySelectorAll("[data-linkaction]").forEach(function(btn){btn.addEventListener("click",function(){ actOnLink(btn.dataset.linkaction,btn.dataset.id); });});
+  }
+  function findLink(id){ return state.links.find(function(x){ return x.id === id; }); }
+  async function actOnLink(action, id){
+    var x = findLink(id); if (!x) return;
+    try{
+      if (action === "open"){
+        var url = validatedLinkUrl(x.url);
+        var popup = window.open(url, "_blank", "noopener,noreferrer");
+        // Alguns navegadores retornam null com noopener mesmo ao abrir corretamente.
+      }else if (action === "copy") copyText(x.url, "Endereço copiado");
+      else if (action === "favorite"){
+        var uid = state.session.user.id, had = state.linkFavorites.has(id);
+        // Atualização otimista, revertida em caso de falha.
+        if (had) state.linkFavorites.delete(id); else state.linkFavorites.add(id);
+        renderLinks();
+        var r = had ? await sb.from("console_links_favoritos").delete().eq("link_id", id).eq("user_id", uid)
+          : await sb.from("console_links_favoritos").insert({link_id:id,user_id:uid});
+        if (r.error){ if (had) state.linkFavorites.add(id); else state.linkFavorites.delete(id); renderLinks(); throw r.error; }
+      }else if (action === "edit" && isAdmin()) openLinksForm(id);
+      else if (action === "delete" && isAdmin()) askConfirm("Excluir link", "Excluir “" + x.nome + "” para toda a equipe?", "Excluir link", async function(){
+        var r = await sb.from("console_links").delete().eq("id",id).select("id");
+        if (r.error) throw r.error;
+        if (!r.data || !r.data.length) throw Error("Sem permissão para excluir.");
+        await loadLinks(); showToast("Link excluído");
+      });
+    }catch(err){showToast(friendlyError(err));}
+  }
+  function openLinksForm(id){
+    if (!isAdmin()) return;
+    var x = id ? findLink(id) : null;
+    state.linkEditingId = x ? x.id : null;
+    $("links-modal-title").textContent = x ? "Editar link" : "Adicionar link";
+    $("links-name").value = x ? x.nome : "";
+    $("links-url").value = x ? x.url : "";
+    $("links-description").value = x ? x.descricao || "" : "";
+    $("links-category").value = x ? x.categoria : LINK_CATS[0];
+    setError("links-error", "");
+    openModal("links"); setTimeout(function(){ $("links-name").focus(); },50);
+  }
+  async function saveLink(e){
+    e.preventDefault(); if (!isAdmin()) return;
+    setError("links-error", "");
+    var btn = $("links-save");
+    try{
+      var nome = $("links-name").value.trim(), url = validatedLinkUrl($("links-url").value);
+      var descricao = $("links-description").value.trim() || null, categoria = $("links-category").value;
+      if (!nome || nome.length > 120 || (descricao && descricao.length > 500) || !LINK_CATS.includes(categoria)) throw Error("Verifique os campos do formulário.");
+      var record = {nome:nome,url:url,descricao:descricao,categoria:categoria};
+      busy(btn,true,"Salvando…");
+      var r = state.linkEditingId ? await sb.from("console_links").update(record).eq("id",state.linkEditingId).select("id")
+        : await sb.from("console_links").insert(record).select("id");
+      if (r.error) throw r.error;
+      if (!r.data || !r.data.length) throw Error("Sem permissão para salvar.");
+      closeModal("links"); await loadLinks(); showToast("Link salvo para a equipe");
+    }catch(err){setError("links-error",friendlyError(err));}
+    finally{busy(btn,false);}
+  }
+
   /* ---------- Views ---------- */
   function setView(v, opts){
     opts = opts || {};
@@ -1882,18 +2047,19 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("search").parentElement.hidden = v === "equipe";
     $("btn-new").hidden = v === "contatos" ? false : !(isAdmin() && v === "respostas");
     $("btn-new-label").textContent = v === "contatos" ? "Novo contato" : "Nova resposta";
-    $("search").placeholder = v === "bloco" ? "Buscar nos dias do seu bloco de notas…"
+    $("search").placeholder = v === "links" ? "Buscar links por nome, descrição ou URL…" : v === "bloco" ? "Buscar nos dias do seu bloco de notas…"
       : v === "contatos" ? "Buscar contato por nome, setor ou número…"
       : "Buscar respostas por título, texto, telefone ou tag…";
     if (v === "bloco"){ if (!state.padDate) state.padDate = todayIso(); loadPadEditor(!!opts.focus); }
     else if (v === "equipe"){ renderTeam(); loadMembers(); }
+    else if (v === "links"){ renderLinks(); if (Date.now() - state.linksLastFetch > 30000) loadLinks(); if (opts.focus) $("search").focus(); }
     else if (v === "contatos"){ renderContatos(); if (opts.focus) $("search").focus(); }
     else { renderRespostas(); }
     try{ history.replaceState(null, "", "#" + v); }catch(e){}
   }
 
   /* ---------- Overlays ---------- */
-  var MODALS = { form: "form-modal-wrap", contact: "contact-modal-wrap", hist: "hist-modal-wrap", confirm: "confirm-modal-wrap", member: "member-modal-wrap", secret: "secret-modal-wrap", pw: "pw-modal-wrap" };
+  var MODALS = { form: "form-modal-wrap", contact: "contact-modal-wrap", hist: "hist-modal-wrap", confirm: "confirm-modal-wrap", member: "member-modal-wrap", secret: "secret-modal-wrap", pw: "pw-modal-wrap", links: "links-modal-wrap" };
   function openModal(name){ $(MODALS[name]).classList.add("show"); syncOverlay(); }
   function closeModal(name){
     $(MODALS[name]).classList.remove("show"); syncOverlay();
@@ -1904,7 +2070,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   function syncOverlay(){ $("overlay").classList.toggle("show", anyPanelOpen()); }
   function closeTop(){
     var open = openModalNames();
-    var order = ["confirm", "secret", "pw", "member", "contact", "hist", "form"];
+    var order = ["confirm", "secret", "pw", "member", "contact", "links", "hist", "form"];
     for (var i = 0; i < order.length; i++){ if (open.indexOf(order[i]) !== -1){ closeModal(order[i]); return true; } }
     if ($("drawer").classList.contains("open")){ closeDetail(); return true; }
     return false;
@@ -1935,11 +2101,15 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("tab-contatos").addEventListener("click", function(){ setView("contatos", { focus: true }); });
     $("tab-bloco").addEventListener("click", function(){ setView("bloco", { focus: true }); });
     $("tab-equipe").addEventListener("click", function(){ setView("equipe"); });
+    $("tab-links").addEventListener("click", function(){ setView("links", { focus: true }); });
+    $("links-add").addEventListener("click", function(){ openLinksForm(null); });
+    $("links-form").addEventListener("submit", saveLink);
 
     $("search").addEventListener("input", function(e){
       state.query = e.target.value;
       if (state.view === "bloco") renderDays();
       else if (state.view === "contatos") renderContatos();
+      else if (state.view === "links") renderLinks();
       else renderRespostas();
     });
     $("search").addEventListener("keydown", function(e){
@@ -2039,6 +2209,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       if (Date.now() - state.lastRespostasFetch > 60000){
         loadRespostas();
         loadContatos();
+        if (state.view === "links") loadLinks();
         if (!Object.keys(padPending).length && document.activeElement !== $("pad-text")) loadPad();
         if (isAdmin()) loadMembers();
       }
@@ -2046,6 +2217,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     window.addEventListener("focus", refreshIfStale);
     document.addEventListener("visibilitychange", function(){ if (document.visibilityState === "visible") refreshIfStale(); else if (Object.keys(padPending).length) flushPad(); });
 
+    setInterval(function(){
+      if (!$('screen-app').hidden && state.session && state.view === "links" && Date.now() - state.linksLastFetch > 30000) loadLinks();
+    }, 30000);
     var lastToday = todayIso();
     setInterval(function(){
       var t = todayIso();
