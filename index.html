@@ -638,7 +638,7 @@
     </div>
     <div class="search-wrap">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.2" stroke="currentColor" stroke-width="1.6"/><path d="M11 11L14.2 14.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      <input id="search" type="text" placeholder="Buscar respostas por título, texto, telefone ou tag…" autocomplete="off">
+      <input id="search" type="text" placeholder="Pesquisar respostas, contatos e links…" autocomplete="off" aria-label="Pesquisar em todo o console">
       <span class="kbd-hint mono">/</span>
     </div>
     <button class="btn btn-primary" id="btn-new" hidden>
@@ -653,7 +653,7 @@
       <button class="tab" role="tab" id="tab-contatos" aria-selected="false">Contatos <span class="count" id="tab-count-contatos"></span></button>
       <button class="tab" role="tab" id="tab-bloco" aria-selected="false">Bloco de notas <span class="count" id="tab-count-bloco"></span></button>
       <button class="tab" role="tab" id="tab-equipe" aria-selected="false" hidden>Equipe <span class="count" id="tab-count-equipe"></span></button>
-      <button class="tab" role="tab" id="tab-busca" aria-selected="false">Pesquisa global</button>
+      <button class="tab" role="tab" id="tab-busca" aria-selected="false" hidden tabindex="-1">Pesquisa global</button>
       <button class="tab" role="tab" id="tab-links" aria-selected="false">Links úteis <span class="count" id="tab-count-links"></span></button>
     </div>
     <div class="viewbar-right">
@@ -689,7 +689,7 @@
   </section>
 
   <section id="view-busca" hidden>
-    <div class="team-head"><div><h2>Pesquisa global</h2><p>Encontre orientações, telefones e links em um só lugar. Pesquise usando a barra superior.</p></div></div>
+    <div class="team-head"><div><h2>Resultados da pesquisa</h2><p>Resultados de respostas prontas, contatos e links úteis.</p></div></div>
     <div id="global-status" class="status-line"></div><div id="global-results" class="global-results"></div>
   </section>
 
@@ -1248,6 +1248,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     var pref = null; try{ pref = localStorage.getItem(VIEW_KEY); }catch(e){}
     var initial = VIEWS.indexOf(hash) !== -1 ? hash : (VIEWS.includes(pref) ? pref : "respostas");
     if (initial === "equipe" && !isAdmin()) initial = "respostas";
+    if (initial === "busca") initial = "respostas";
     setView(initial, { focus: initial === "bloco" });
   }
 
@@ -2277,30 +2278,30 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   }
 
   /* ---------- Views ---------- */
+  var searchOrigin = "respostas";
   function setView(v, opts){
     opts = opts || {};
     if (v === "equipe" && !isAdmin()) v = "respostas";
     if (VIEWS.indexOf(v) === -1) v = "respostas";
     state.view = v;
-    try{ localStorage.setItem(VIEW_KEY, v); }catch(e){}
+    if (v !== "busca") searchOrigin = v;
+    try{ if(v !== "busca") localStorage.setItem(VIEW_KEY, v); }catch(e){}
     VIEWS.forEach(function(x){
       $("view-" + x).hidden = v !== x;
       $("tab-" + x).setAttribute("aria-selected", String(v === x));
     });
     if (!opts.keepQuery){ state.query = ""; $("search").value = ""; }
-    $("search").parentElement.hidden = v === "equipe";
+    $("search").parentElement.hidden = false;
     $("btn-new").hidden = v === "contatos" ? false : !(isAdmin() && v === "respostas");
     $("btn-new-label").textContent = v === "contatos" ? "Novo contato" : "Nova resposta";
-    $("search").placeholder = v === "busca" ? "Pesquise em respostas, contatos e links…" : v === "favoritos" ? "Pesquisar nos meus favoritos…" : v === "links" ? "Buscar links por nome, descrição ou URL…" : v === "bloco" ? "Buscar nos dias do seu bloco de notas…"
-      : v === "contatos" ? "Buscar contato por nome, setor ou número…"
-      : "Buscar respostas por título, texto, telefone ou tag…";
+    $("search").placeholder = "Pesquisar respostas, contatos e links…";
     if (v === "bloco"){ if (!state.padDate) state.padDate = todayIso(); loadPadEditor(!!opts.focus); }
     else if (v === "equipe"){ renderTeam(); loadMembers(); }
     else if (v === "links"){ renderLinks(); if (Date.now() - state.linksLastFetch > 30000) loadLinks(); if (opts.focus) $("search").focus(); }
     else if (v === "busca" || v === "favoritos"){ renderDiscovery(); if (opts.focus) $("search").focus(); }
     else if (v === "contatos"){ renderContatos(); if (opts.focus) $("search").focus(); }
     else { renderRespostas(); }
-    try{ history.replaceState(null, "", "#" + v); }catch(e){}
+    try{ history.replaceState(null, "", "#" + (v === "busca" ? searchOrigin : v)); }catch(e){}
   }
 
   /* ---------- Overlays ---------- */
@@ -2347,7 +2348,6 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("tab-bloco").addEventListener("click", function(){ setView("bloco", { focus: true }); });
     $("tab-equipe").addEventListener("click", function(){ setView("equipe"); });
     $("tab-links").addEventListener("click", function(){ setView("links", { focus: true }); });
-    $("tab-busca").addEventListener("click", function(){ setView("busca", { focus: true }); });
     $("links-add").addEventListener("click", function(){ openLinksForm(null); });
     $("links-category").addEventListener("change",toggleLinkCategoryInput);
     $("links-manage-cats").addEventListener("click",function(){if(!isAdmin())return;setError("links-cats-error","");renderLinkCategoriesManager();openModal("linksCats");});
@@ -2360,24 +2360,34 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     });
     $("links-form").addEventListener("submit", saveLink);
 
+    // A barra superior busca em todas as seções, independentemente da aba ativa.
+    // Enquanto há texto, exibimos os resultados; ao limpar, voltamos à aba de origem.
     $("search").addEventListener("input", function(e){
       state.query = e.target.value;
-      if (state.view === "bloco") renderDays();
-      else if (state.view === "contatos") renderContatos();
-      else if (state.view === "links") renderLinks();
-      else if (state.view === "busca" || state.view === "favoritos") renderDiscovery();
-      else renderRespostas();
+      if (state.query.trim()){
+        if (state.view !== "busca") searchOrigin = state.view;
+        setView("busca", { keepQuery: true });
+      }else if (state.view === "busca"){
+        setView(searchOrigin, { keepQuery: true });
+      }
     });
     $("search").addEventListener("keydown", function(e){
+      if (e.key === "Escape" && state.view === "busca"){
+        e.preventDefault();
+        state.query = "";
+        $("search").value = "";
+        setView(searchOrigin, { keepQuery: true });
+        $("search").focus();
+        return;
+      }
+      if (e.key === "Enter" && state.view === "busca"){
+        var first = $("global-results").querySelector('[data-disc-act="open"]');
+        if (first){ e.preventDefault(); first.click(); }
+      }
       if (e.key === "Enter" && state.view === "bloco"){
         e.preventDefault();
         var first = $("pad-days").querySelector(".day-item");
         if (first) selectPadDate(first.getAttribute("data-date"), true);
-      }
-      if (e.key === "Enter" && state.view === "contatos" && state.query.trim()){
-        e.preventDefault();
-        var num = $("contacts").querySelector("[data-copy]");
-        if (num) num.click();
       }
     });
 
