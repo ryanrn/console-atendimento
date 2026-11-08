@@ -521,6 +521,42 @@
   .useful-link .link-favorite[aria-pressed="true"]{color:var(--warn);border-color:var(--warn)}
   @media(max-width:560px){.useful-link .link-actions .btn{flex:1 1 auto}}
 
+  /* Ações administrativas das respostas em linha própria, sem sobrepor a estrela. */
+  #view-respostas .card.has-actions .card-actions{
+    position: static;
+    top: auto;
+    right: auto;
+    order: 5;
+    align-self: flex-end;
+    display: flex;
+    gap: 5px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .12s ease, visibility .12s ease;
+  }
+  #view-respostas .card.has-actions:hover .card-actions,
+  #view-respostas .card.has-actions:focus-within .card-actions{
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  #view-respostas .card.has-actions .card-date,
+  #view-respostas .card.has-actions:hover .card-date,
+  #view-respostas .card.has-actions:focus-within .card-date,
+  #view-respostas .card.has-actions:hover .response-card-right .card-date,
+  #view-respostas .card.has-actions:focus-within .response-card-right .card-date{
+    opacity: 1;
+    pointer-events: auto;
+  }
+  @media (hover: none){
+    #view-respostas .card.has-actions .card-actions{
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+  }
+
   /* Estrela individual nas respostas, com favoritos no topo da própria aba */
   .response-card-right{display:inline-flex;align-items:center;gap:7px;margin-left:auto;min-width:0}
   .response-star{width:31px;height:31px;flex:none;font-size:22px;line-height:1;color:var(--text-muted);background:var(--surface);border:1px solid var(--border)}
