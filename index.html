@@ -257,6 +257,16 @@
   .empty-state h3{ color: var(--text); margin: 0 0 6px; font-size: 16px; }
   .empty-state p{ margin: 0 auto; max-width: 360px; font-size: 13.5px; line-height: 1.5; }
 
+  /* ---------- Pesquisa global e favoritos ---------- */
+  .global-results{display:flex;flex-direction:column;gap:18px}
+  .global-group{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(290px,100%),1fr));gap:12px}
+  .global-heading{font-size:13px;font-weight:700;color:var(--text-muted);margin:4px 0 10px}
+  .global-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow-sm);min-width:0;display:flex;flex-direction:column;gap:9px}
+  .global-card-title{font-size:14px;font-weight:700;line-height:1.4;overflow-wrap:anywhere}
+  .global-card-detail{font-size:12.5px;color:var(--text-muted);overflow-wrap:anywhere;line-height:1.5;max-height:75px;overflow:hidden}
+  .global-card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+  .global-card-actions .btn{white-space:normal}
+  .global-star{margin-left:auto;min-width:38px;color:var(--accent-strong)}
   /* ---------- Notepad ---------- */
   .pad{ display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 16px; align-items: start; }
   .pad-days{
@@ -600,6 +610,8 @@
       <button class="tab" role="tab" id="tab-contatos" aria-selected="false">Contatos <span class="count" id="tab-count-contatos"></span></button>
       <button class="tab" role="tab" id="tab-bloco" aria-selected="false">Bloco de notas <span class="count" id="tab-count-bloco"></span></button>
       <button class="tab" role="tab" id="tab-equipe" aria-selected="false" hidden>Equipe <span class="count" id="tab-count-equipe"></span></button>
+      <button class="tab" role="tab" id="tab-busca" aria-selected="false">Pesquisa global</button>
+      <button class="tab" role="tab" id="tab-favoritos" aria-selected="false">★ Meus favoritos <span class="count" id="tab-count-favoritos"></span></button>
       <button class="tab" role="tab" id="tab-links" aria-selected="false">Links úteis <span class="count" id="tab-count-links"></span></button>
     </div>
     <div class="viewbar-right">
@@ -634,6 +646,14 @@
     <div class="contacts" id="contacts"></div>
   </section>
 
+  <section id="view-busca" hidden>
+    <div class="team-head"><div><h2>Pesquisa global</h2><p>Encontre orientações, telefones e links em um só lugar. Pesquise usando a barra superior.</p></div></div>
+    <div id="global-status" class="status-line"></div><div id="global-results" class="global-results"></div>
+  </section>
+  <section id="view-favoritos" hidden>
+    <div class="team-head"><div><h2>Meus favoritos</h2><p>Seu espaço pessoal com respostas, contatos e links mais usados. Só você vê seus favoritos.</p></div></div>
+    <div id="favorites-status" class="status-line"></div><div id="favorites-results" class="global-results"></div>
+  </section>
   <section id="view-bloco" hidden>
     <div class="pad">
       <nav class="pad-days" id="pad-days" aria-label="Dias"></nav>
@@ -927,7 +947,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     session: null, me: null,
     view: "respostas",
     respostas: [], contatos: [], pad: {}, members: [], links: [], linkCategories: [], linkFavorites: new Set(), linkCategory: "all", linkEditingId: null, linksLastFetch: 0,
-    query: "", activeCategory: "all",
+    query: "", activeCategory: "all", personalFavorites: new Set(), favoritesReady: false,
     selectedId: null, editingId: null, padDate: null,
     lastRespostasFetch: 0
   };
@@ -1160,7 +1180,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     await flushPad();
     if (state.session) removeLS(DRAFT_PREFIX + state.session.user.id);
     try{ await sb.auth.signOut(); }catch(e){}
-    state.session = null; state.me = null; state.respostas = []; state.contatos = []; state.pad = {}; state.members = []; state.links = []; state.linkCategories = []; state.linkFavorites = new Set(); state.linksLastFetch = 0;
+    state.session = null; state.me = null; state.respostas = []; state.contatos = []; state.pad = {}; state.members = []; state.links = []; state.linkCategories = []; state.linkFavorites = new Set(); state.personalFavorites = new Set(); state.favoritesReady = false; state.linksLastFetch = 0;
     $("pad-text").value = "";
     closeAllPanels();
     $("user-menu").hidden = true;
@@ -1184,7 +1204,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("drawer-history").hidden = !isAdmin();
     $("btn-deleted").hidden = !isAdmin();
     state.padDate = todayIso();
-    await Promise.all([loadRespostas(), loadContatos(), loadPad(), isAdmin() ? loadMembers() : Promise.resolve()]);
+    await Promise.all([loadRespostas(), loadContatos(), loadPad(), loadLinks(), loadPersonalFavorites(), isAdmin() ? loadMembers() : Promise.resolve()]);
     var hash = (location.hash || "").replace("#", "");
     var pref = null; try{ pref = localStorage.getItem(VIEW_KEY); }catch(e){}
     var initial = VIEWS.indexOf(hash) !== -1 ? hash : (pref || "respostas");
@@ -1200,7 +1220,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       return { id: x.id, title: x.titulo, category: x.categoria, tags: x.tags || [], content: x.conteudo, updated: x.atualizado_em };
     });
     state.lastRespostasFetch = Date.now();
-    if (state.view === "respostas") renderRespostas(); else updateTabCounts();
+    if (state.view === "respostas") renderRespostas(); else if (state.view === "busca" || state.view === "favoritos") renderDiscovery(); else updateTabCounts();
   }
 
   function allCategories(){
@@ -1289,6 +1309,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("tab-count-bloco").textContent = n || "";
     $("tab-count-equipe").textContent = state.members.length || "";
     $("tab-count-links").textContent = state.links.length || "";
+    $("tab-count-favoritos").textContent = state.personalFavorites.size + state.linkFavorites.size || "";
   }
 
   function findResposta(id){ return state.respostas.filter(function(x){ return x.id === id; })[0]; }
@@ -1451,7 +1472,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   }
 
   /* ---------- Contatos ---------- */
-  var VIEWS = ["respostas", "contatos", "bloco", "equipe", "links"];
+  var VIEWS = ["respostas", "contatos", "bloco", "equipe", "links", "busca", "favoritos"];
   var COPY_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M3 10.5V3.8A1.3 1.3 0 014.3 2.5H10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
   var EDIT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.3 2.3a1.5 1.5 0 012.1 2.1L5 12.8l-2.9.7.7-2.9 8.5-8.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>';
   var TRASH_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6.5 5V3.5h3V5M4.5 5l.6 8.2a1 1 0 001 .8h3.8a1 1 0 001-.8L11.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -1474,7 +1495,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     var r = await sb.from("console_contatos").select("id, nome, telefones, observacao, criado_por, atualizado_em").order("nome");
     if (r.error){ showToast(friendlyError(r.error, "Não foi possível carregar os contatos")); return; }
     state.contatos = r.data || [];
-    if (state.view === "contatos") renderContatos(); else updateTabCounts();
+    if (state.view === "contatos") renderContatos(); else if (state.view === "busca" || state.view === "favoritos") renderDiscovery(); else updateTabCounts();
   }
 
   function filteredContatos(){
@@ -2036,7 +2057,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       state.linkCategories = (results[2].data || []).map(function(x){return x.nome;});
       state.linkFavorites = new Set((results[1].data || []).map(function(x){ return x.link_id; }));
       state.linksLastFetch = Date.now();
-      renderLinks(); updateTabCounts();
+      renderLinks(); updateTabCounts(); if (state.view === "busca" || state.view === "favoritos") renderDiscovery();
       if ($("links-cats-modal-wrap").classList.contains("show")) renderLinkCategoriesManager();
     }catch(err){ if (state.view === "links") $("links-status").textContent = "Não foi possível carregar links. Confira se a migração SQL foi aplicada. " + friendlyError(err); }
     finally{ linksLoading = false; }
@@ -2086,10 +2107,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         var uid = state.session.user.id, had = state.linkFavorites.has(id);
         // Atualização otimista, revertida em caso de falha.
         if (had) state.linkFavorites.delete(id); else state.linkFavorites.add(id);
-        renderLinks();
+        renderLinks(); updateTabCounts(); if (["busca","favoritos"].includes(state.view)) renderDiscovery();
         var r = had ? await sb.from("console_links_favoritos").delete().eq("link_id", id).eq("user_id", uid)
           : await sb.from("console_links_favoritos").insert({link_id:id,user_id:uid});
-        if (r.error){ if (had) state.linkFavorites.add(id); else state.linkFavorites.delete(id); renderLinks(); throw r.error; }
+        if (r.error){ if (had) state.linkFavorites.add(id); else state.linkFavorites.delete(id); renderLinks(); updateTabCounts(); if (["busca","favoritos"].includes(state.view)) renderDiscovery(); throw r.error; }
       }else if (action === "edit" && isAdmin()) openLinksForm(id);
       else if (action === "delete" && isAdmin()) askConfirm("Excluir link", "Excluir “" + x.nome + "” para toda a equipe?", "Excluir link", async function(){
         var r = await sb.from("console_links").delete().eq("id",id).select("id");
@@ -2136,6 +2157,73 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     finally{busy(btn,false);}
   }
 
+
+  /* ---------- Discovery / personal favorites ---------- */
+  function favKey(type,id){return type + ":" + id;}
+  function isFavorite(type,id){return type === "link" ? state.linkFavorites.has(id) : state.personalFavorites.has(favKey(type,id));}
+  async function loadPersonalFavorites(){
+    if (!state.session) return;
+    var uid = state.session.user.id;
+    var r = await sb.from("console_favoritos_pessoais").select("tipo,item_id").eq("user_id",uid);
+    if (r.error){ state.favoritesReady = false; console.warn("Favoritos pessoais:",r.error.message); if (["busca","favoritos"].includes(state.view)) showToast("Execute a migração SQL para habilitar os favoritos pessoais."); return; }
+    if (!state.session || state.session.user.id !== uid) return;
+    state.personalFavorites = new Set((r.data || []).map(function(x){return favKey(x.tipo,x.item_id);}));
+    state.favoritesReady = true; updateTabCounts();
+    if (["busca","favoritos"].includes(state.view)) renderDiscovery();
+  }
+  function searchNormalize(s){return stripAccents(String(s || "").toLowerCase()).replace(/\s+/g," ").trim();}
+  function searchScore(text,title,query){
+    var terms = searchNormalize(query).split(" ").filter(Boolean);
+    var hay = searchNormalize(text), top = searchNormalize(title);
+    if (!terms.every(function(t){return hay.includes(t);})){return -1;}
+    return terms.reduce(function(v,t){return v+(top===t?10:top.startsWith(t)?6:top.includes(t)?3:1);},0);
+  }
+  function discoveryEntries(){
+    var list=[];
+    state.respostas.forEach(function(x){list.push({type:"resposta",id:x.id,title:x.title,detail:x.category+" · "+summarize(x.content,180),hay:[x.title,x.category,x.content,(x.tags||[]).join(" ")].join(" ")});});
+    state.contatos.forEach(function(x){list.push({type:"contato",id:x.id,title:x.nome,detail:(x.observacao?x.observacao+" · ":"")+(x.telefones||[]).map(formatNum).join(" · "),hay:[x.nome,x.observacao,(x.telefones||[]).join(" "),(x.telefones||[]).map(digitsOf).join(" ")].join(" ")});});
+    state.links.forEach(function(x){list.push({type:"link",id:x.id,title:x.nome,detail:(x.descricao?x.descricao+" · ":"")+x.url,hay:[x.nome,x.url,x.descricao,x.categoria].join(" ")});});
+    return list;
+  }
+  function discoveryCard(e){
+    var fav=isFavorite(e.type,e.id),typeLabel={resposta:"Resposta",contato:"Contato",link:"Link"}[e.type];
+    return '<article class="global-card"><div class="card-top"><span class="cat-chip" style="--h:'+hueFor(typeLabel)+'"><span class="dot"></span>'+typeLabel+'</span></div>'+
+      '<div class="global-card-title">'+escapeHtml(e.title)+'</div><div class="global-card-detail">'+escapeHtml(e.detail)+'</div>'+
+      '<div class="global-card-actions"><button class="btn btn-sm btn-primary" data-disc-act="open" data-disc-type="'+e.type+'" data-disc-id="'+escapeHtml(e.id)+'">'+(e.type==='link'?'Abrir ↗':e.type==='contato'?'Copiar número':'Ver resposta')+'</button>'+
+      '<button class="btn btn-sm global-star" aria-pressed="'+fav+'" aria-label="'+(fav?'Remover dos favoritos':'Adicionar aos favoritos')+'" title="'+(fav?'Remover dos favoritos':'Favoritar')+'" data-disc-act="favorite" data-disc-type="'+e.type+'" data-disc-id="'+escapeHtml(e.id)+'">'+(fav?'★ Salvo':'☆ Favoritar')+'</button></div></article>';
+  }
+  function renderDiscovery(){
+    var favOnly=state.view==='favoritos',q=state.query.trim(),list=discoveryEntries();
+    if(favOnly)list=list.filter(function(e){return isFavorite(e.type,e.id);});
+    if(q)list=list.map(function(e){e.score=searchScore(e.hay,e.title,q);return e;}).filter(function(e){return e.score>=0;});
+    list.sort(function(a,b){return (b.score||0)-(a.score||0) || Number(isFavorite(b.type,b.id))-Number(isFavorite(a.type,a.id)) || a.title.localeCompare(b.title,'pt-BR');});
+    var groups=[['resposta','Respostas prontas'],['contato','Contatos'],['link','Links úteis']];
+    var html=groups.map(function(g){var items=list.filter(function(e){return e.type===g[0];});return items.length?'<section><h3 class="global-heading">'+g[1]+' · '+items.length+'</h3><div class="global-group">'+items.map(discoveryCard).join('')+'</div></section>':'';}).join('');
+    var target=$(favOnly?'favorites-results':'global-results');
+    target.innerHTML=html || '<div class="empty-state"><h3>'+(favOnly?'Nenhum favorito encontrado':'Nenhum resultado encontrado')+'</h3><p>'+(favOnly?'Marque a estrela em uma resposta, contato ou link.':'Experimente pesquisar pelo nome de um setor, termo de atendimento ou endereço.')+'</p></div>';
+    $(favOnly?'favorites-status':'global-status').textContent=list.length+' '+(list.length===1?'resultado':'resultados')+(favOnly?' nos seus favoritos':' em respostas, contatos e links');
+    target.querySelectorAll('[data-disc-act]').forEach(function(b){b.addEventListener('click',function(){discoveryAction(b.dataset.discAct,b.dataset.discType,b.dataset.discId);});});
+  }
+  async function discoveryAction(action,type,id){
+    if(action==='favorite'){
+      if(type==='link'){await actOnLink('favorite',id);renderDiscovery();return;}
+      if(!state.favoritesReady){showToast('Execute a migração SQL de favoritos antes de utilizar.');return;}
+      var uid=state.session.user.id,key=favKey(type,id),had=state.personalFavorites.has(key);
+      if(had)state.personalFavorites.delete(key);else state.personalFavorites.add(key);
+      renderDiscovery();updateTabCounts();
+      try{
+        var r=had?await sb.from('console_favoritos_pessoais').delete().eq('user_id',uid).eq('tipo',type).eq('item_id',id)
+          :await sb.from('console_favoritos_pessoais').insert({user_id:uid,tipo:type,item_id:id});
+        if(r.error)throw r.error;
+      }catch(err){if(had)state.personalFavorites.add(key);else state.personalFavorites.delete(key);renderDiscovery();updateTabCounts();showToast(friendlyError(err));}
+    }else if(action==='open'){
+      if(type==='resposta'){openDetail(id);}
+      else if(type==='contato'){
+        var c=findContato(id);if(c && (c.telefones||[]).length)copyText(digitsOf(c.telefones[0]),'Número copiado');else showToast('Contato sem telefone');
+      }else if(type==='link')await actOnLink('open',id);
+    }
+  }
+
   /* ---------- Views ---------- */
   function setView(v, opts){
     opts = opts || {};
@@ -2151,12 +2239,13 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("search").parentElement.hidden = v === "equipe";
     $("btn-new").hidden = v === "contatos" ? false : !(isAdmin() && v === "respostas");
     $("btn-new-label").textContent = v === "contatos" ? "Novo contato" : "Nova resposta";
-    $("search").placeholder = v === "links" ? "Buscar links por nome, descrição ou URL…" : v === "bloco" ? "Buscar nos dias do seu bloco de notas…"
+    $("search").placeholder = v === "busca" ? "Pesquise em respostas, contatos e links…" : v === "favoritos" ? "Pesquisar nos meus favoritos…" : v === "links" ? "Buscar links por nome, descrição ou URL…" : v === "bloco" ? "Buscar nos dias do seu bloco de notas…"
       : v === "contatos" ? "Buscar contato por nome, setor ou número…"
       : "Buscar respostas por título, texto, telefone ou tag…";
     if (v === "bloco"){ if (!state.padDate) state.padDate = todayIso(); loadPadEditor(!!opts.focus); }
     else if (v === "equipe"){ renderTeam(); loadMembers(); }
     else if (v === "links"){ renderLinks(); if (Date.now() - state.linksLastFetch > 30000) loadLinks(); if (opts.focus) $("search").focus(); }
+    else if (v === "busca" || v === "favoritos"){ renderDiscovery(); if (opts.focus) $("search").focus(); }
     else if (v === "contatos"){ renderContatos(); if (opts.focus) $("search").focus(); }
     else { renderRespostas(); }
     try{ history.replaceState(null, "", "#" + v); }catch(e){}
@@ -2206,6 +2295,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("tab-bloco").addEventListener("click", function(){ setView("bloco", { focus: true }); });
     $("tab-equipe").addEventListener("click", function(){ setView("equipe"); });
     $("tab-links").addEventListener("click", function(){ setView("links", { focus: true }); });
+    $("tab-busca").addEventListener("click", function(){ setView("busca", { focus: true }); });
+    $("tab-favoritos").addEventListener("click", function(){ setView("favoritos", { focus: true }); });
     $("links-add").addEventListener("click", function(){ openLinksForm(null); });
     $("links-category").addEventListener("change",toggleLinkCategoryInput);
     $("links-manage-cats").addEventListener("click",function(){if(!isAdmin())return;setError("links-cats-error","");renderLinkCategoriesManager();openModal("linksCats");});
@@ -2223,6 +2314,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       if (state.view === "bloco") renderDays();
       else if (state.view === "contatos") renderContatos();
       else if (state.view === "links") renderLinks();
+      else if (state.view === "busca" || state.view === "favoritos") renderDiscovery();
       else renderRespostas();
     });
     $("search").addEventListener("keydown", function(e){
@@ -2322,7 +2414,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       if (Date.now() - state.lastRespostasFetch > 60000){
         loadRespostas();
         loadContatos();
-        if (state.view === "links") loadLinks();
+        if (["links","busca","favoritos"].includes(state.view)) { loadLinks(); loadPersonalFavorites(); }
         if (!Object.keys(padPending).length && document.activeElement !== $("pad-text")) loadPad();
         if (isAdmin()) loadMembers();
       }
