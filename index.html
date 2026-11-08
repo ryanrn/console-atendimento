@@ -520,6 +520,13 @@
   .useful-link .link-favorite{margin-left:auto}
   .useful-link .link-favorite[aria-pressed="true"]{color:var(--warn);border-color:var(--warn)}
   @media(max-width:560px){.useful-link .link-actions .btn{flex:1 1 auto}}
+
+  /* Estrela individual nas respostas, com favoritos no topo da própria aba */
+  .response-card-right{display:inline-flex;align-items:center;gap:7px;margin-left:auto;min-width:0}
+  .response-star{width:31px;height:31px;flex:none;font-size:22px;line-height:1;color:var(--text-muted);background:var(--surface);border:1px solid var(--border)}
+  .response-star:hover,.response-star[aria-pressed="true"]{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+  .card.has-actions:hover .response-card-right .card-date,.card.has-actions:focus-within .response-card-right .card-date{opacity:0}
+  @media(max-width:560px){.response-card-right{gap:4px}.response-star{width:34px;height:34px}}
 </style>
 </head>
 <body>
@@ -611,7 +618,6 @@
       <button class="tab" role="tab" id="tab-bloco" aria-selected="false">Bloco de notas <span class="count" id="tab-count-bloco"></span></button>
       <button class="tab" role="tab" id="tab-equipe" aria-selected="false" hidden>Equipe <span class="count" id="tab-count-equipe"></span></button>
       <button class="tab" role="tab" id="tab-busca" aria-selected="false">Pesquisa global</button>
-      <button class="tab" role="tab" id="tab-favoritos" aria-selected="false">★ Meus favoritos <span class="count" id="tab-count-favoritos"></span></button>
       <button class="tab" role="tab" id="tab-links" aria-selected="false">Links úteis <span class="count" id="tab-count-links"></span></button>
     </div>
     <div class="viewbar-right">
@@ -650,10 +656,7 @@
     <div class="team-head"><div><h2>Pesquisa global</h2><p>Encontre orientações, telefones e links em um só lugar. Pesquise usando a barra superior.</p></div></div>
     <div id="global-status" class="status-line"></div><div id="global-results" class="global-results"></div>
   </section>
-  <section id="view-favoritos" hidden>
-    <div class="team-head"><div><h2>Meus favoritos</h2><p>Seu espaço pessoal com respostas, contatos e links mais usados. Só você vê seus favoritos.</p></div></div>
-    <div id="favorites-status" class="status-line"></div><div id="favorites-results" class="global-results"></div>
-  </section>
+
   <section id="view-bloco" hidden>
     <div class="pad">
       <nav class="pad-days" id="pad-days" aria-label="Dias"></nav>
@@ -1207,7 +1210,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     await Promise.all([loadRespostas(), loadContatos(), loadPad(), loadLinks(), loadPersonalFavorites(), isAdmin() ? loadMembers() : Promise.resolve()]);
     var hash = (location.hash || "").replace("#", "");
     var pref = null; try{ pref = localStorage.getItem(VIEW_KEY); }catch(e){}
-    var initial = VIEWS.indexOf(hash) !== -1 ? hash : (pref || "respostas");
+    var initial = VIEWS.indexOf(hash) !== -1 ? hash : (VIEWS.includes(pref) ? pref : "respostas");
     if (initial === "equipe" && !isAdmin()) initial = "respostas";
     setView(initial, { focus: initial === "bloco" });
   }
@@ -1242,6 +1245,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       if (!q) return true;
       return (n.title + " " + n.content + " " + n.category + " " + (n.tags || []).join(" ")).toLowerCase().indexOf(q) !== -1;
     }).sort(function(a, b){
+      var favoriteOrder = Number(isFavorite("resposta", b.id)) - Number(isFavorite("resposta", a.id));
+      if (favoriteOrder) return favoriteOrder;
       if (a.updated !== b.updated) return a.updated < b.updated ? 1 : -1;
       return a.title.localeCompare(b.title, "pt-BR");
     });
@@ -1286,7 +1291,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           '<button class="icon-btn" data-action="edit" data-id="' + escapeHtml(n.id) + '" aria-label="Editar" title="Editar"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.3 2.3a1.5 1.5 0 012.1 2.1L5 12.8l-2.9.7.7-2.9 8.5-8.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>' +
           '<button class="icon-btn" data-action="delete" data-id="' + escapeHtml(n.id) + '" aria-label="Excluir" title="Excluir"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6.5 5V3.5h3V5M4.5 5l.6 8.2a1 1 0 001 .8h3.8a1 1 0 001-.8L11.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
         '</div>' : '') +
-        '<div class="card-top">' + catChipHtml(n.category) + '<span class="card-date">' + formatDate(n.updated) + '</span></div>' +
+        '<div class="card-top">' + catChipHtml(n.category) + '<span class="response-card-right"><span class="card-date">' + formatDate(n.updated) + '</span><button type="button" class="icon-btn response-star" data-action="favorite" data-id="' + escapeHtml(n.id) + '" aria-pressed="' + isFavorite("resposta",n.id) + '" aria-label="' + (isFavorite("resposta",n.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos') + '" title="' + (isFavorite("resposta",n.id) ? 'Remover dos favoritos' : 'Favoritar resposta') + '">' + (isFavorite("resposta",n.id) ? '★' : '☆') + '</button></span></div>' +
         '<h3 class="card-title">' + escapeHtml(n.title) + '</h3>' +
         '<p class="card-summary">' + escapeHtml(summarize(aplicarSaudacao(n.content).text)) + '</p>' +
         '<div class="card-tags">' + (n.tags || []).slice(0, 4).map(function(t){ return '<span class="tag">' + escapeHtml(t) + '</span>'; }).join("") + '</div>' +
@@ -1296,6 +1301,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       card.addEventListener("click", function(e){ if (!e.target.closest("[data-action]")) openDetail(card.getAttribute("data-id")); });
       card.addEventListener("keydown", function(e){ if (e.key === "Enter" && !e.target.closest("[data-action]")) openDetail(card.getAttribute("data-id")); });
     });
+    grid.querySelectorAll('[data-action="favorite"]').forEach(function(b){ b.addEventListener("click", function(e){ e.stopPropagation(); togglePersonalFavorite("resposta", b.getAttribute("data-id")); }); });
     grid.querySelectorAll('[data-action="edit"]').forEach(function(b){ b.addEventListener("click", function(e){ e.stopPropagation(); openForm(b.getAttribute("data-id")); }); });
     grid.querySelectorAll('[data-action="delete"]').forEach(function(b){ b.addEventListener("click", function(e){ e.stopPropagation(); requestDeleteResposta(b.getAttribute("data-id")); }); });
   }
@@ -1309,7 +1315,6 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("tab-count-bloco").textContent = n || "";
     $("tab-count-equipe").textContent = state.members.length || "";
     $("tab-count-links").textContent = state.links.length || "";
-    $("tab-count-favoritos").textContent = state.personalFavorites.size + state.linkFavorites.size || "";
   }
 
   function findResposta(id){ return state.respostas.filter(function(x){ return x.id === id; })[0]; }
@@ -1472,7 +1477,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   }
 
   /* ---------- Contatos ---------- */
-  var VIEWS = ["respostas", "contatos", "bloco", "equipe", "links", "busca", "favoritos"];
+  var VIEWS = ["respostas", "contatos", "bloco", "equipe", "links", "busca"];
   var COPY_ICON = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M3 10.5V3.8A1.3 1.3 0 014.3 2.5H10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
   var EDIT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.3 2.3a1.5 1.5 0 012.1 2.1L5 12.8l-2.9.7.7-2.9 8.5-8.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>';
   var TRASH_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6.5 5V3.5h3V5M4.5 5l.6 8.2a1 1 0 001 .8h3.8a1 1 0 001-.8L11.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -2165,11 +2170,12 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     if (!state.session) return;
     var uid = state.session.user.id;
     var r = await sb.from("console_favoritos_pessoais").select("tipo,item_id").eq("user_id",uid);
-    if (r.error){ state.favoritesReady = false; console.warn("Favoritos pessoais:",r.error.message); if (["busca","favoritos"].includes(state.view)) showToast("Execute a migração SQL para habilitar os favoritos pessoais."); return; }
+    if (r.error){ state.favoritesReady = false; console.warn("Favoritos pessoais:",r.error.message); showToast("Não foi possível carregar favoritos. Verifique a migração SQL."); return; }
     if (!state.session || state.session.user.id !== uid) return;
     state.personalFavorites = new Set((r.data || []).map(function(x){return favKey(x.tipo,x.item_id);}));
     state.favoritesReady = true; updateTabCounts();
-    if (["busca","favoritos"].includes(state.view)) renderDiscovery();
+    if (state.view === "respostas") renderRespostas();
+    else if (state.view === "busca") renderDiscovery();
   }
   function searchNormalize(s){return stripAccents(String(s || "").toLowerCase()).replace(/\s+/g," ").trim();}
   function searchScore(text,title,query){
@@ -2204,18 +2210,28 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $(favOnly?'favorites-status':'global-status').textContent=list.length+' '+(list.length===1?'resultado':'resultados')+(favOnly?' nos seus favoritos':' em respostas, contatos e links');
     target.querySelectorAll('[data-disc-act]').forEach(function(b){b.addEventListener('click',function(){discoveryAction(b.dataset.discAct,b.dataset.discType,b.dataset.discId);});});
   }
+  async function togglePersonalFavorite(type,id){
+    if(!state.favoritesReady){showToast('Não foi possível carregar os favoritos. Confira se a migração SQL foi executada.');return;}
+    var uid=state.session.user.id,key=favKey(type,id),had=state.personalFavorites.has(key);
+    if(had)state.personalFavorites.delete(key);else state.personalFavorites.add(key);
+    if(state.view==='respostas')renderRespostas();
+    if(state.view==='busca')renderDiscovery();
+    updateTabCounts();
+    try{
+      var r=had?await sb.from('console_favoritos_pessoais').delete().eq('user_id',uid).eq('tipo',type).eq('item_id',id)
+        :await sb.from('console_favoritos_pessoais').insert({user_id:uid,tipo:type,item_id:id});
+      if(r.error)throw r.error;
+    }catch(err){
+      if(had)state.personalFavorites.add(key);else state.personalFavorites.delete(key);
+      if(state.view==='respostas')renderRespostas();
+      if(state.view==='busca')renderDiscovery();
+      updateTabCounts();showToast(friendlyError(err));
+    }
+  }
   async function discoveryAction(action,type,id){
     if(action==='favorite'){
       if(type==='link'){await actOnLink('favorite',id);renderDiscovery();return;}
-      if(!state.favoritesReady){showToast('Execute a migração SQL de favoritos antes de utilizar.');return;}
-      var uid=state.session.user.id,key=favKey(type,id),had=state.personalFavorites.has(key);
-      if(had)state.personalFavorites.delete(key);else state.personalFavorites.add(key);
-      renderDiscovery();updateTabCounts();
-      try{
-        var r=had?await sb.from('console_favoritos_pessoais').delete().eq('user_id',uid).eq('tipo',type).eq('item_id',id)
-          :await sb.from('console_favoritos_pessoais').insert({user_id:uid,tipo:type,item_id:id});
-        if(r.error)throw r.error;
-      }catch(err){if(had)state.personalFavorites.add(key);else state.personalFavorites.delete(key);renderDiscovery();updateTabCounts();showToast(friendlyError(err));}
+      await togglePersonalFavorite(type,id);
     }else if(action==='open'){
       if(type==='resposta'){openDetail(id);}
       else if(type==='contato'){
@@ -2296,7 +2312,6 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("tab-equipe").addEventListener("click", function(){ setView("equipe"); });
     $("tab-links").addEventListener("click", function(){ setView("links", { focus: true }); });
     $("tab-busca").addEventListener("click", function(){ setView("busca", { focus: true }); });
-    $("tab-favoritos").addEventListener("click", function(){ setView("favoritos", { focus: true }); });
     $("links-add").addEventListener("click", function(){ openLinksForm(null); });
     $("links-category").addEventListener("change",toggleLinkCategoryInput);
     $("links-manage-cats").addEventListener("click",function(){if(!isAdmin())return;setError("links-cats-error","");renderLinkCategoriesManager();openModal("linksCats");});
