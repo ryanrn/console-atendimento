@@ -563,6 +563,47 @@
   .response-star:hover,.response-star[aria-pressed="true"]{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
   .card.has-actions:hover .response-card-right .card-date,.card.has-actions:focus-within .response-card-right .card-date{opacity:0}
   @media(max-width:560px){.response-card-right{gap:4px}.response-star{width:34px;height:34px}}
+  /* Cards de respostas: categoria e ações com espaços independentes.
+     Evita que categorias longas sejam espremidas pela data e pela estrela. */
+  #view-respostas .card{min-width:0;overflow-wrap:break-word}
+  #view-respostas .card-top{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:start;
+    gap:8px;
+    min-width:0;
+  }
+  #view-respostas .card-top .cat-chip{
+    min-width:0;
+    max-width:100%;
+    width:fit-content;
+    box-sizing:border-box;
+    line-height:1.3;
+    white-space:normal;
+    overflow-wrap:normal;
+    word-break:normal;
+  }
+  #view-respostas .card-top .cat-chip .dot{flex:0 0 7px}
+  #view-respostas .response-card-right{
+    display:flex;
+    flex-direction:column-reverse;
+    align-items:flex-end;
+    gap:5px;
+    min-width:0;
+    margin-left:0;
+  }
+  #view-respostas .response-card-right .card-date{
+    font-size:10px;
+    white-space:nowrap;
+    opacity:1;
+  }
+  #view-respostas .card-title{overflow-wrap:anywhere;text-wrap:wrap}
+  #view-respostas .card-summary{overflow-wrap:anywhere}
+  #view-respostas .response-star{flex:0 0 auto}
+  @media(max-width:560px){
+    #view-respostas .card-top{gap:6px}
+    #view-respostas .response-card-right .card-date{font-size:10px}
+  }
   /* Visualizador de imagem das respostas: interno, adaptável e acessível. */
   .answer-image-wrap a{display:inline-block;cursor:zoom-in}
   .image-lightbox[hidden]{display:none!important}
