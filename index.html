@@ -563,6 +563,14 @@
   .response-star:hover,.response-star[aria-pressed="true"]{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
   .card.has-actions:hover .response-card-right .card-date,.card.has-actions:focus-within .response-card-right .card-date{opacity:0}
   @media(max-width:560px){.response-card-right{gap:4px}.response-star{width:34px;height:34px}}
+  /* Visualizador de imagem das respostas: interno, adaptável e acessível. */
+  .answer-image-wrap a{display:inline-block;cursor:zoom-in}
+  .image-lightbox[hidden]{display:none!important}
+  .image-lightbox{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;padding:55px 20px 24px;background:rgba(0,0,0,.88)}
+  .image-lightbox img{max-width:100%;max-height:calc(100dvh - 95px);object-fit:contain;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,.45)}
+  .image-lightbox-close{position:absolute;right:18px;top:14px;border:1px solid rgba(255,255,255,.35);border-radius:10px;background:rgba(35,35,35,.92);color:#fff;padding:9px 15px;font:inherit;font-weight:600;cursor:pointer}
+  .image-lightbox-close:focus-visible{outline:3px solid #a5d8ff;outline-offset:3px}
+  @media(max-width:600px){.image-lightbox{padding:60px 10px 15px}.image-lightbox-close{right:10px;top:10px}}
 </style>
 </head>
 <body>
@@ -742,6 +750,10 @@
 </div>
 
 <div class="overlay" id="overlay"></div>
+<div class="image-lightbox" id="image-lightbox" role="dialog" aria-modal="true" aria-label="Visualização ampliada da imagem de referência" aria-hidden="true" hidden>
+  <button type="button" class="image-lightbox-close" id="image-lightbox-close" aria-label="Fechar imagem ampliada">✕ Fechar</button>
+  <img id="image-lightbox-photo" alt="Imagem de referência ampliada">
+</div>
 
 <aside class="drawer" id="drawer" aria-hidden="true">
   <div class="drawer-head">
@@ -984,6 +996,24 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   function resetImagePreview(){if(previewObjectUrl)URL.revokeObjectURL(previewObjectUrl);previewObjectUrl=null;}
   function imagePreview(url){$("f-image-preview").innerHTML = '<img alt="Prévia da imagem" style="max-width:100%;max-height:200px;object-fit:contain;border-radius:8px" src="'+escapeHtml(url)+'">';$("f-image-preview").hidden=false;$("f-image-remove").hidden=false;}
   async function imageSignedUrl(path){var r=await sb.storage.from(IMAGE_BUCKET).createSignedUrl(path,300);if(r.error)throw r.error;return r.data.signedUrl;}
+  var lightboxPreviousFocus = null;
+  function openImageLightbox(url){
+    if(!url)return;
+    lightboxPreviousFocus=document.activeElement;
+    $("image-lightbox-photo").src=url;
+    $("image-lightbox").hidden=false;
+    $("image-lightbox").setAttribute("aria-hidden","false");
+    $("image-lightbox-close").focus();
+  }
+  function closeImageLightbox(){
+    if($("image-lightbox").hidden)return false;
+    $("image-lightbox").hidden=true;
+    $("image-lightbox").setAttribute("aria-hidden","true");
+    $("image-lightbox-photo").removeAttribute("src");
+    if(lightboxPreviousFocus&&lightboxPreviousFocus.isConnected)lightboxPreviousFocus.focus();
+    lightboxPreviousFocus=null;
+    return true;
+  }
   async function renderAnswerImage(n){
     var seq=++imageRequestId,box=$("drawer-image");box.hidden=true;box.innerHTML="";
     if(!n.imagePath)return;
@@ -2339,13 +2369,14 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   function anyPanelOpen(){ return $("drawer").classList.contains("open") || openModalNames().length > 0; }
   function syncOverlay(){ $("overlay").classList.toggle("show", anyPanelOpen()); }
   function closeTop(){
+    if(closeImageLightbox())return true;
     var open = openModalNames();
     var order = ["confirm", "secret", "pw", "member", "contact", "linksCats", "links", "hist", "form"];
     for (var i = 0; i < order.length; i++){ if (open.indexOf(order[i]) !== -1){ closeModal(order[i]); return true; } }
     if ($("drawer").classList.contains("open")){ closeDetail(); return true; }
     return false;
   }
-  function closeAllPanels(){ Object.keys(MODALS).forEach(function(k){ $(MODALS[k]).classList.remove("show"); }); closeDetail(); }
+  function closeAllPanels(){ closeImageLightbox(); Object.keys(MODALS).forEach(function(k){ $(MODALS[k]).classList.remove("show"); }); closeDetail(); }
 
   var confirmAction = null;
   function askConfirm(title, body, okLabel, action, neutral){
@@ -2418,6 +2449,19 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     $("btn-new").addEventListener("click", function(){ if (state.view === "contatos") openContactForm(null); else openForm(null); });
     $("contact-form").addEventListener("submit", saveContato);
     $("drawer-close").addEventListener("click", closeDetail);
+    $("drawer-image").addEventListener("click",function(e){
+      var link=e.target.closest("a");
+      if(!link||!this.contains(link))return;
+      e.preventDefault();
+      openImageLightbox(link.href);
+    });
+    $("image-lightbox-close").addEventListener("click",closeImageLightbox);
+    $("image-lightbox").addEventListener("click",function(e){if(e.target===this)closeImageLightbox();});
+    $("image-lightbox").addEventListener("keydown",function(e){
+      if(e.key!=="Tab")return;
+      e.preventDefault();
+      $("image-lightbox-close").focus();
+    });
     $("drawer-edit").addEventListener("click", function(){ var id = state.selectedId; closeDetail(); openForm(id); });
     $("drawer-delete").addEventListener("click", function(){ requestDeleteResposta(state.selectedId); });
     $("drawer-copy").addEventListener("click", function(){
